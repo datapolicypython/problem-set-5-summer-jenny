@@ -40,10 +40,95 @@ import requests
 
 ### 1.
 
+```{python}
+#doing the intial action to get the link parsed
+url = 'https://oig.hhs.gov/fraud/enforcement/' # the link we would be scraping
+requested = requests.get(url) 
+soup = BeautifulSoup(requested.content, 'html.parser')
 
+# Find all actions based on the main <li> tag containing each card
+actions = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
 
+dataset = [] #creating an ampty list to store craped data
+
+for items in actions:
+    title_tag = items.find('h2', class_='usa-card__heading') #tag for the title of enforcement is h2
+    if title_tag:
+        title = title_tag.get_text(strip=True)  
+        link = title_tag.find('a')['href'] if title_tag.find('a') else None #the tag for hyperlinks
+        link = f"https://oig.hhs.gov{link}" if link else None  # Complete relative link
+
+    #looking for dates
+    date_tag = items.find(lambda tag: tag.name == "span" and "text-base-dark" in tag.get("class", []) and "padding-right-105" in tag.get("class", []))
+    date = date_tag.get_text(strip=True) if date_tag else None
+
+    #now we will be looking for category
+    category_tag = items.find(lambda tag: tag.name == "ul" and "display-inline" in tag.get("class", []) and "add-list-reset" in tag.get("class", []))
+    category = None
+    if category_tag:
+        li_tag = category_tag.find(lambda tag: tag.name == "li" and "display-inline-block" in tag.get("class", []) and "usa-tag" in tag.get("class", []))
+        category = li_tag.get_text(strip=True) if li_tag else None
+
+    # Append data to dataset
+    dataset.append({
+        'Title': title, 
+        'Date': date, 
+        'Category': category, 
+        'Link': link 
+    })
+
+final_df = pd.DataFrame(dataset)
+print(final_df.head(5))
+```
 
 ### 2.
+
+```{python}
+# Initialize an empty list to store agency names
+agencies = []
+
+# Loop through each link in final_df
+for index, row in final_df.iterrows():
+    link = row['Link']
+    if link:  # Only proceed if the link is valid
+        try:
+            response = requests.get(link)  # Request the page using the link
+            soup = BeautifulSoup(response.text, 'html.parser')  # Parse the content of the page
+
+            # Find all <ul> elements with the specified class containing the agency details
+            uls = soup.find_all("ul", class_="usa-list usa-list--unstyled margin-y-2")
+            
+            # Initialize a placeholder for the agency name
+            agency_name = 'N/A'
+            
+            # Iterate over each <ul> element
+            for ul in uls:
+                # Find all <span> elements within each <ul> that match the class
+                spans = ul.find_all("span", class_="padding-right-2 text-base")
+                
+                # Ensure there are enough <span> tags to avoid IndexError
+                if len(spans) > 1:
+                    agency = spans[1]  # Select the second <span>, which contains "Agency:"
+                    
+                    # Use next_sibling to access the text following the <span>
+                    agency_name = agency.next_sibling.strip() if agency.next_sibling else 'N/A'
+                    
+                    # Stop after finding the first matching <ul> and <span> structure
+                    break
+            
+            # Append the extracted agency name to the agencies list
+            agencies.append(agency_name)
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching {link}: {e}")
+            agencies.append('N/A')
+
+# Add agency names to the DataFrame and print its head
+final_df['Agency'] = agencies  # Create a new column in our original df called Agency
+print(final_df.head(5))
+```
+
+
 
 
 ## Making the scraper dynamic
@@ -60,20 +145,19 @@ import requests
 
  c.
 
-
- ## Plot data based on scraped data (using Altair)
-
-
- ### 1.
+## Plot data based on scraped data (using Altair)
 
 
-
- ### 2.
+### 1.
 
 
 
+### 2.
 
- ## Create maps of enforcement activity
+
+
+
+## Create maps of enforcement activity
 
 
 ### 1.
