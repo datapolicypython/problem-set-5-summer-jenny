@@ -1,0 +1,103 @@
+---
+title: "Pset V"
+author: "Summer Negahdar & Jenny Zhong"
+format: 
+  pdf:
+    keep-tex: true
+    include-in-header: 
+      text: |
+        \usepackage[margin=0.7in]{geometry}
+        \usepackage{fvextra}
+        \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+include-before-body:
+  text: |
+    \RecustomVerbatimEnvironment{verbatim}{Verbatim}{
+      showspaces = false,
+      showtabs = false,
+      breaksymbolleft={},
+      breaklines
+    }
+execute:
+  code-fold: True
+
+---
+Partner 1: Summer Negahdar(samarneg)
+Partner 2: 
+This submission is our work alone and complies with the 30538 integrity policy.” Add
+your initials to indicate your agreement: **__** **__**
+“I have uploaded the names of anyone else other than my partner and I worked with on
+the problem set here”
+Late coins used this pset: **__** Late coins left after submission: **__**
+
+## Develop Initial scraper and crawler
+
+### 1.
+
+
+
+
+### 2.
+
+
+## Making the scraper dynamic
+
+### 1.
+
+
+
+ a.
+
+
+ b.
+
+
+ c.
+
+
+ ## Plot data based on scraped data (using Altair)
+
+
+ ### 1.
+
+
+
+ ### 2.
+
+
+
+
+ ## Create maps of enforcement activity
+
+
+### 1.
+
+
+### 2.
+
+
+
+
+## Extra Credit: Calculate the enforcement actions on a per-capita basis
+
+### 1.
+
+
+
+### 2.
+
+
+
+### 3.
+
+
+
+
+
+
+
+
+
+
+
+
+
