@@ -128,6 +128,16 @@ final_df['Agency'] = agencies  # Create a new column in our original df called A
 print(final_df.head(5))
 ```
 
+```{python}
+##for jenny
+## since you need the date column to be a date, I will convert it for you
+
+final_df['Date'] = pd.to_datetime(final_df['Date'], errors='coerce')
+
+# Check the data type to confirm
+print(final_df.dtypes)
+print(final_df.head())
+```
 
 
 
@@ -137,13 +147,16 @@ print(final_df.head(5))
 
 
 
- a.
 
 
- b.
+
+a.
 
 
- c.
+b.
+
+
+c.
 
 ## Plot data based on scraped data (using Altair)
 
