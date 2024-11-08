@@ -29,6 +29,12 @@ your initials to indicate your agreement: **__** **__**
 the problem set here”
 Late coins used this pset: **__** Late coins left after submission: **__**
 
+```{python}
+from bs4 import BeautifulSoup
+
+
+```
+
 ## Develop Initial scraper and crawler
 
 ### 1.
