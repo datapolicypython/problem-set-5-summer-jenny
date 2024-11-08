@@ -31,7 +31,8 @@ Late coins used this pset: **__** Late coins left after submission: **__**
 
 ```{python}
 from bs4 import BeautifulSoup
-
+import pandas as pd
+import requests
 
 ```
 
