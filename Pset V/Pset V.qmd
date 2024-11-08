@@ -128,22 +128,38 @@ final_df['Agency'] = agencies  # Create a new column in our original df called A
 print(final_df.head(5))
 ```
 
+```{python}
+##for jenny
+## since you need the date column to be a date, I will convert it for you
+
+final_df['date_column'] = pd.to_datetime(df['date_column'], format='%B %d %Y')
+
+# Check the data type to confirm
+print(df.dtypes)
+print(df.head())
+```
 
 
 
 ## Making the scraper dynamic
 
 ### 1.
+the pseudo code is like this: 
+1. take all the ndates we already have in final_df
+2. there will be two outcomes: before or after 2013
+    I. if before 2013, then show an error message that this is not the period we want
+    II. if after 2013, then continue
 
 
 
- a.
+
+a.
 
 
- b.
+b.
 
 
- c.
+c.
 
 ## Plot data based on scraped data (using Altair)
 
