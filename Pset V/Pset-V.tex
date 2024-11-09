@@ -225,11 +225,6 @@ Late coins left after submission: **\_\_**
 \end{Highlighting}
 \end{Shaded}
 
-\begin{verbatim}
-/Users/samarnegahdar/Desktop/untitled folder/problem-set-5-summer-jenny/Pset V/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
-  warnings.warn(
-\end{verbatim}
-
 \subsection{Develop Initial scraper and
 crawler}\label{develop-initial-scraper-and-crawler}
 
@@ -280,11 +275,11 @@ crawler}\label{develop-initial-scraper-and-crawler}
 
 \begin{verbatim}
                                                Title              Date  \
-0  Boise Nurse Practitioner Sentenced To 48 Month...  November 7, 2024   
-1  Former Traveling Nurse Pleads Guilty To Tamper...  November 7, 2024   
-2  Former Arlington Resident Sentenced To Prison ...  November 7, 2024   
-3  Paroled Felon Sentenced To Six Years For Fraud...  November 7, 2024   
-4  Former Licensed Counselor Sentenced For Defrau...  November 6, 2024   
+0  Pharmacist and Brother Convicted of $15M Medic...  November 8, 2024   
+1  Boise Nurse Practitioner Sentenced To 48 Month...  November 7, 2024   
+2  Former Traveling Nurse Pleads Guilty To Tamper...  November 7, 2024   
+3  Former Arlington Resident Sentenced To Prison ...  November 7, 2024   
+4  Paroled Felon Sentenced To Six Years For Fraud...  November 7, 2024   
 
                      Category  \
 0  Criminal and Civil Actions   
@@ -294,11 +289,11 @@ crawler}\label{develop-initial-scraper-and-crawler}
 4  Criminal and Civil Actions   
 
                                                 Link  
-0  https://oig.hhs.gov/fraud/enforcement/boise-nu...  
-1  https://oig.hhs.gov/fraud/enforcement/former-t...  
-2  https://oig.hhs.gov/fraud/enforcement/former-a...  
-3  https://oig.hhs.gov/fraud/enforcement/paroled-...  
-4  https://oig.hhs.gov/fraud/enforcement/former-l...  
+0  https://oig.hhs.gov/fraud/enforcement/pharmaci...  
+1  https://oig.hhs.gov/fraud/enforcement/boise-nu...  
+2  https://oig.hhs.gov/fraud/enforcement/former-t...  
+3  https://oig.hhs.gov/fraud/enforcement/former-a...  
+4  https://oig.hhs.gov/fraud/enforcement/paroled-...  
 \end{verbatim}
 
 \subsubsection{2.}\label{section-1}
@@ -352,11 +347,11 @@ crawler}\label{develop-initial-scraper-and-crawler}
 
 \begin{verbatim}
                                                Title              Date  \
-0  Boise Nurse Practitioner Sentenced To 48 Month...  November 7, 2024   
-1  Former Traveling Nurse Pleads Guilty To Tamper...  November 7, 2024   
-2  Former Arlington Resident Sentenced To Prison ...  November 7, 2024   
-3  Paroled Felon Sentenced To Six Years For Fraud...  November 7, 2024   
-4  Former Licensed Counselor Sentenced For Defrau...  November 6, 2024   
+0  Pharmacist and Brother Convicted of $15M Medic...  November 8, 2024   
+1  Boise Nurse Practitioner Sentenced To 48 Month...  November 7, 2024   
+2  Former Traveling Nurse Pleads Guilty To Tamper...  November 7, 2024   
+3  Former Arlington Resident Sentenced To Prison ...  November 7, 2024   
+4  Paroled Felon Sentenced To Six Years For Fraud...  November 7, 2024   
 
                      Category  \
 0  Criminal and Civil Actions   
@@ -366,24 +361,104 @@ crawler}\label{develop-initial-scraper-and-crawler}
 4  Criminal and Civil Actions   
 
                                                 Link  \
-0  https://oig.hhs.gov/fraud/enforcement/boise-nu...   
-1  https://oig.hhs.gov/fraud/enforcement/former-t...   
-2  https://oig.hhs.gov/fraud/enforcement/former-a...   
-3  https://oig.hhs.gov/fraud/enforcement/paroled-...   
-4  https://oig.hhs.gov/fraud/enforcement/former-l...   
+0  https://oig.hhs.gov/fraud/enforcement/pharmaci...   
+1  https://oig.hhs.gov/fraud/enforcement/boise-nu...   
+2  https://oig.hhs.gov/fraud/enforcement/former-t...   
+3  https://oig.hhs.gov/fraud/enforcement/former-a...   
+4  https://oig.hhs.gov/fraud/enforcement/paroled-...   
 
                                               Agency  
-0  November 7, 2024; U.S. Attorney's Office, Dist...  
-1  U.S. Attorney's Office, District of Massachusetts  
-2  U.S. Attorney's Office, Eastern District of Vi...  
-3  U.S. Attorney's Office, Middle District of Flo...  
-4  U.S. Attorney's Office, Western District of Texas  
+0                         U.S. Department of Justice  
+1  November 7, 2024; U.S. Attorney's Office, Dist...  
+2  U.S. Attorney's Office, District of Massachusetts  
+3  U.S. Attorney's Office, Eastern District of Vi...  
+4  U.S. Attorney's Office, Middle District of Flo...  
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\#\#for jenny}
+\CommentTok{\#\# since you need the date column to be a date, I will convert it for you}
+
+\NormalTok{final\_df[}\StringTok{\textquotesingle{}Date\textquotesingle{}}\NormalTok{] }\OperatorTok{=}\NormalTok{ pd.to\_datetime(final\_df[}\StringTok{\textquotesingle{}Date\textquotesingle{}}\NormalTok{], errors}\OperatorTok{=}\StringTok{\textquotesingle{}coerce\textquotesingle{}}\NormalTok{)}
+
+\CommentTok{\# Check the data type to confirm}
+\BuiltInTok{print}\NormalTok{(final\_df.dtypes)}
+\BuiltInTok{print}\NormalTok{(final\_df.head())}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+Title               object
+Date        datetime64[ns]
+Category            object
+Link                object
+Agency              object
+dtype: object
+                                               Title       Date  \
+0  Pharmacist and Brother Convicted of $15M Medic... 2024-11-08   
+1  Boise Nurse Practitioner Sentenced To 48 Month... 2024-11-07   
+2  Former Traveling Nurse Pleads Guilty To Tamper... 2024-11-07   
+3  Former Arlington Resident Sentenced To Prison ... 2024-11-07   
+4  Paroled Felon Sentenced To Six Years For Fraud... 2024-11-07   
+
+                     Category  \
+0  Criminal and Civil Actions   
+1  Criminal and Civil Actions   
+2  Criminal and Civil Actions   
+3  Criminal and Civil Actions   
+4  Criminal and Civil Actions   
+
+                                                Link  \
+0  https://oig.hhs.gov/fraud/enforcement/pharmaci...   
+1  https://oig.hhs.gov/fraud/enforcement/boise-nu...   
+2  https://oig.hhs.gov/fraud/enforcement/former-t...   
+3  https://oig.hhs.gov/fraud/enforcement/former-a...   
+4  https://oig.hhs.gov/fraud/enforcement/paroled-...   
+
+                                              Agency  
+0                         U.S. Department of Justice  
+1  November 7, 2024; U.S. Attorney's Office, Dist...  
+2  U.S. Attorney's Office, District of Massachusetts  
+3  U.S. Attorney's Office, Eastern District of Vi...  
+4  U.S. Attorney's Office, Middle District of Flo...  
 \end{verbatim}
 
 \subsection{Making the scraper
 dynamic}\label{making-the-scraper-dynamic}
 
 \subsubsection{1.}\label{section-2}
+
+the pseudo code for writing the function will be like: 1. going thorugh
+every row in the df Summer has created.
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{1}
+\item
+  extracting the dates from date column
+\item
+  there will be two types of date
+
+  I. after 2013 \textgreater\textgreater{} continue with the rest of
+  function
+
+  \begin{enumerate}
+  \def\labelenumii{\Roman{enumii}.}
+  \setcounter{enumii}{1}
+  \tightlist
+  \item
+    before 2013 \textgreater\textgreater{} show me an error sign that
+    says this is before our desired timeline
+  \end{enumerate}
+\item
+  save all the extracted dates on a csv file called
+  ``enfrocment\_actions\_month\_year.csv''
+\item
+  do not push it to git
+\item
+  print the head
+\end{enumerate}
 
 \begin{enumerate}
 \def\labelenumi{\alph{enumi}.}
