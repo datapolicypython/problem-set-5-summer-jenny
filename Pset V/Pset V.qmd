@@ -25,9 +25,9 @@ Partner 1: Summer Negahdar(samarneg)
 Partner 2: Jenny Zhong (jzhong1)
 This submission is our work alone and complies with the 30538 integrity policy.” Add
 your initials to indicate your agreement: **SN** **JZ**
-“I have uploaded the names of anyone else other than my partner and I worked with on the problem set here”
 
 ```{python}
+import csv
 from bs4 import BeautifulSoup
 import pandas as pd
 import requests
@@ -36,21 +36,20 @@ import requests
 import datetime
 from time import sleep
 import os
+from concurrent.futures import ThreadPoolExecutor
 ```
 
 ## Develop Initial scraper and crawler
 
 ### 1.
-
 ```{python}
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 
 def fetch_page_data(url):
     response = requests.get(url)
+    if response.status_code != 200:
+        print(f"Failed to fetch data from {url}")
+        return []  # Return empty list if failed to fetch data
+
     soup = BeautifulSoup(response.content, 'html.parser')
     data = []
     actions = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
@@ -58,39 +57,31 @@ def fetch_page_data(url):
         title_tag = action.find('h2', class_='usa-card__heading')
         title = title_tag.get_text(strip=True) if title_tag else 'No Title Provided'
         
-        link = title_tag.find('a')['href'] if title_tag and title_tag.find('a') else 'No Link Provided'
-        link = f"https://oig.hhs.gov{link}" if link.startswith('/') else link
+        link_tag = title_tag.find('a')
+        link = f"https://oig.hhs.gov{link_tag['href']}" if link_tag else 'No Link Provided'
 
-        # Correctly locate the date using the new structure
         date_div = action.find('div', class_='font-body-sm margin-top-1')
-        date = date_div.find('span', class_='text-base-dark padding-right-105').get_text(strip=True) if date_div else 'No Date Provided'
+        date_tag = date_div.find('span', class_='text-base-dark padding-right-105')
+        date = date_tag.get_text(strip=True) if date_tag else 'No Date Provided'
         
-        # Correctly locate the category using the new structure
         category_ul = action.find('ul', class_='display-inline add-list-reset')
-        category = category_ul.find('li').get_text(strip=True) if category_ul and category_ul.find('li') else 'No Category Provided'
+        category_tag = category_ul.find('li')
+        category = category_tag.get_text(strip=True) if category_tag else 'No Category Provided'
 
         data.append({'Title': title, 'Date': date, 'Category': category, 'Link': link})
     return data
 
-def scrape_all_pages(base_url, num_pages):
-    urls = [f"{base_url}?page={i}" for i in range(1, num_pages + 1)]
-    all_data = []
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        results = list(executor.map(fetch_page_data, urls))
-    for result in results:
-        all_data.extend(result)
-    return pd.DataFrame(all_data)
-
 # Base URL of the site to scrape
 base_url = 'https://oig.hhs.gov/fraud/enforcement/'
 
-num_pages = 482  
+# Fetch data from the first page only
+first_page_data = fetch_page_data(base_url)
 
-# Scrape the data
-final_df = scrape_all_pages(base_url, num_pages)
 
-print(final_df.head(-5))
-print( "number of items found is", len(final_df))
+df = pd.DataFrame(first_page_data)
+
+# this scraping is only done on the first page!
+print(df.head(5))
 ```
 
 ### 2.
@@ -98,84 +89,50 @@ print( "number of items found is", len(final_df))
 ```{python}
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def fetch_agency(link):
+def fetch_agency_details(link):
+    """ Fetches the agency details for a given URL """
     try:
-        response = requests.get(link)  # Request the page using the link
-        soup = BeautifulSoup(response.text, 'html.parser')  # Parse the content of the page
-
-        # Find all <ul> elements with the specified class containing the agency details
-        uls = soup.find_all("ul", class_="usa-list usa-list--unstyled margin-y-2")
-        agency_name = 'N/A'  # Default if no agency info is found
-
-        # Iterate over each <ul> element
-        for ul in uls:
-            spans = ul.find_all("span", class_="padding-right-2 text-base")
-            if len(spans) > 1:
-                agency = spans[1]  # Select the second <span>, which contains "Agency:"
-                agency_name = agency.next_sibling.strip() if agency.next_sibling else 'N/A'
-                break  # Stop after finding the first matching <ul> and <span> structure
-
-        return agency_name
-
+        response = requests.get(link, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            uls = soup.find_all("ul", class_="usa-list usa-list--unstyled margin-y-2")
+            for ul in uls:
+                spans = ul.find_all("span", class_="padding-right-2 text-base")
+                if len(spans) > 1:
+                    agency = spans[1]
+                    return agency.next_sibling.strip() if agency.next_sibling else 'N/A'
     except requests.exceptions.RequestException as e:
         print(f"Error fetching {link}: {e}")
-        return 'N/A'
+    return 'N/A'
 
-def clean_agency_data(agency):
-    # Check if the agency data contains a semicolon which might indicate the inclusion of a date
-    if ';' in agency:
-        parts = agency.split(';')
-        if len(parts) > 1:
-            return parts[1].strip()
-    return agency.strip()
-
-def get_agencies(df):
-    agencies = ['N/A'] * len(df)  # Initialize a list of 'N/A' for all agencies
+def process_agencies(df):
+    """ Process each link concurrently and fetch agency details """
+    links = df['Link'].tolist()
+    agencies = []
     with ThreadPoolExecutor(max_workers=10) as executor:
-        future_to_index = {executor.submit(fetch_agency, row['Link']): index for index, row in df.iterrows() if row['Link']}
-        for future in as_completed(future_to_index):
-            index = future_to_index[future]
-            raw_agency = future.result()
-            cleaned_agency = clean_agency_data(raw_agency)  # Clean the agency data
-            agencies[index] = cleaned_agency
+        futures = {executor.submit(fetch_agency_details, link): link for link in links}
+        for future in as_completed(futures):
+            agencies.append(future.result())
     return agencies
 
-def scrape_all_pages(base_url, num_pages):
-    urls = [f"{base_url}?page={i}" for i in range(1, num_pages + 1)]
-    all_data = []
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        results = list(executor.map(fetch_agency, urls))
-    for result in results:
-        all_data.extend(result)
-    return pd.DataFrame(all_data)
+# Assuming df is already loaded with the first page data and contains 'Link'
+if 'Link' in df:
+    df['Agency'] = process_agencies(df)
+    print(df.head(5))
 
-# Base URL of the site to scrape
-base_url = 'https://oig.hhs.gov/fraud/enforcement/'
-
-# Determine the number of pages or set a fixed number if known
-num_pages = 482 
-
-# Scrape the data
-final_df = scrape_all_pages(base_url, num_pages)
-
-# Add cleaned agency data to DataFrame
-final_df['Agency'] = get_agencies(final_df)
-
-# Print the first few rows of the DataFrame to check
-print(final_df.head())
-
-# Save the DataFrame to a CSV file
-final_df.to_csv("enforcement_actions_all_pages.csv", index=False)
-print("Data scraped and saved to enforcement_actions_all_pages.csv")
-
+# Parse dates and check data types
+df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+print(df.dtypes)
+print(df.head())
 ```
 
 ```{python}
-final_df['Date'] = pd.to_datetime(final_df['Date'], errors='coerce')
+final_df['Date'] = pd.to_datetime(final_df['Date'])
 
 # Check the data type to confirm
-print(final_df.dtypes)
-print(final_df.head())
+print(df.dtypes)
+print(df.head())
+print(len(df))
 ```
 
 ## Making the scraper dynamic
@@ -201,7 +158,7 @@ Add a 1-second delay between pages to prevent server-side blockng. If a "next pa
 Step 6: Save data to CSV and print preview 
 Convert the collected data to a pandas DataFrame. Save the DataFrame to a CSV file named enforcement_actions_year_month.csv and print the first few rows for verification. 
 
-**b.** Based on the output, the total number of enforcement actions collected is 1534. 
+b. Based on the output, the total number of enforcement actions collected is 1534. 
 Total enforcement actions collected: 1534
 Earliest enforcement action scraped:
 Date: 2023-01-03 00:00:00
@@ -211,12 +168,8 @@ Agency: January 3, 2023
 Link: https://oig.hhs.gov/fraud/enforcement/podiatrist-pays-90000-to-settle-false-billing-allegations/
 
 ```{python}
-from datetime import datetime 
-import requests
-from bs4 import BeautifulSoup
-import csv
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import sleep
+from datetime import datetime
 
 def scrape_all_pages(base_url, month, year, output_file):
     page_number = 1
@@ -310,17 +263,88 @@ print(f"Link: {earliest_action['Link']}")
 ```
 
 c. 
+```{python}
+#using my partner's code to collect all data from 2021
 
+base_url = 'https://oig.hhs.gov/fraud/enforcement/'
+output_file_2021 = "enforcement_actions_since_jan2021.csv"
+
+scrape_all_pages(base_url, 1, 2021, output_file_2021)
+
+add_agencies_to_csv(output_file_2021)
+df_2021 = pd.read_csv(output_file_2021)
+
+num_enforcement_actions_2021 = len(df_2021)
+print(f"Total enforcement actions collected since 2021: {num_enforcement_actions_2021}")
+
+df_2021['Date'] = pd.to_datetime(df_2021['Date'], errors='coerce')
+
+earliest_action_2021 = df_2021.sort_values(by='Date').iloc[0]
+
+print("\nEarliest enforcement action scraped:")
+print(f"Date: {earliest_action_2021['Date']}")
+print(f"Title: {earliest_action_2021['Title']}")
+print(f"Category: {earliest_action_2021['Category']}")
+print(f"Agency: {earliest_action_2021['Agency']}")
+print(f"Link: {earliest_action_2021['Link']}")
+
+```
 
 ## Plot data based on scraped data (using Altair)
 
 ### 1.
+```{python}
+import altair as alt
 
+df_2021 = pd.read_csv("enforcement_actions_since_jan2021.csv")
+
+df_2021['Date'] = pd.to_datetime(df_2021['Date'], errors='coerce')
+
+print(df_2021.head)
+
+df_2021 = df_2021.dropna(subset=['Date'])
+
+df_2021['YearMonth'] = df_2021['Date'].dt.to_period('M')
+monthly_counts = df_2021.groupby('YearMonth').size().reset_index(name='ActionCount')
+monthly_counts['YearMonth'] = monthly_counts['YearMonth'].dt.to_timestamp()
+
+chart_step31 = alt.Chart(monthly_counts).mark_line(point=True).encode(
+    x=alt.X('YearMonth:T', title='Date (Month-Year)'),
+    y=alt.Y('ActionCount:Q', title='Number of Enforcement Actions')
+).properties(
+    title="Number of Enforcement Actions Over Time (Monthly Aggregation)",
+    width=600,
+    height=400
+)
+
+chart_step31.display()
+```
 
 
 ### 2.
 
+```{python}
+df_2021['Date'] = pd.to_datetime(df_2021['Date'])
 
+# function to categorize titles into subcategories
+def categorize_title(title):
+    title = title.lower()
+    if any(word in title for word in ['health', 'healthcare', 'medicare', 'medical']):
+        return 'Health Care Fraud'
+    elif any(word in title for word in ['bank', 'financial', 'money', 'financial']):
+        return 'Financial Fraud'
+    elif 'drug' in title or 'pharmacy' in title:
+        return 'Drug Enforcement'
+    elif any(word in title for word in ['bribe', 'corruption', 'corrupt']):
+        return 'Bribery/Corruption'
+    else:
+        return 'Other'
+
+df_2021['grouped category'] = df_2021['Title'].apply(categorize_title)
+
+# Grouping data by Category, Topic, and count by month
+grouped_data = df_2021.groupby('grouped category').resample('M', on='Date').size().unstack(level=[0, 1], fill_value=0)
+```
 
 
 ## Create maps of enforcement activity
@@ -345,16 +369,3 @@ c.
 
 
 ### 3.
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,0 +1,6 @@
+# Ignore Python virtual environment
+.venv/
+
+# Ignore large data files
+*.csv
+*.shp
