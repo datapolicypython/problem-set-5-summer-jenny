@@ -24,14 +24,6 @@ execute:
 Partner 1: Summer Negahdar(samarneg)
 Partner 2: Jenny Zhong (jzhong1)
 This submission is our work alone and complies with the 30538 integrity policy.” Add
-your initials to indicate your agreement: **__** **__**
-“I have uploaded the names of anyone else other than my partner and I worked with on
-the problem set here”
-Late coins used this pset: **__** Late coins left after submission: **__**
-
-### A NOTE TO INSTRUCTORS
-
-working on writing the function to scrape and crawl, we found the questions very ocnfusing in terms of task allocation to each partner and therefore instead of writing one short loop for first part and then writing a wholistic loop to scrape all pages we only wrote one gigantic function to scrape everything!
 your initials to indicate your agreement: **SN** **JZ**
 “I have uploaded the names of anyone else other than my partner and I worked with on the problem set here”
 
@@ -44,6 +36,7 @@ import requests
 import datetime
 from time import sleep
 import os
+from concurrent.futures import ThreadPoolExecutor
 ```
 
 ## Develop Initial scraper and crawler
@@ -51,11 +44,6 @@ import os
 ### 1.
 
 ```{python}
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
-from concurrent.futures import ThreadPoolExecutor
-import time
 
 def fetch_page_data(url):
     response = requests.get(url)
@@ -183,7 +171,7 @@ final_df['Date'] = pd.to_datetime(final_df['Date'], errors='coerce')
 
 # Check the data type to confirm
 print(final_df.dtypes)
-print(final_df.head(-5))
+print(final_df.head())
 ```
 
 ## Making the scraper dynamic
@@ -213,169 +201,43 @@ b. Based on the output, the total number of enforcement actions collected is 20.
 
 The details of the earliest enforcement action is "Quincy-Based Physician Group To Pay $650,000 To Resolve Allegations Of False Billing To MassHealth". 
 
-```{python}
-desired_dates= []
-for index, row in final_df.iterrows():
-    date = row['Date']
-    
-    # Check if date is before or after 2013
-    if date.year >= 2013:
-        # If date is after 2013, add it to the list
-        desired_dates.append(date)
-    else:
-        # If date is before 2013, print an error message
-        print("outside desired period")
-
-# Create a new DataFrame to save the valid dates
-desired_dates_df = pd.DataFrame(desired_dates, columns=['Date'])
-
-desired_dates_df.to_csv("enforcement_actions_month_year.csv", index=False)
-print(desired_dates_df.head(-5))
-def dynamic_scraper(month, year):
-    if year < 2013:
-        print("Please enter a year greater than or equal to 2013.")
-        return
-    
-    base_url = 'https://oig.hhs.gov'
-    url = f'{base_url}/fraud/enforcement/?page=1'
-    data = []
-    base_date_obj = datetime.datetime(year, month, 1)
-    end_flag = True
-
-    while end_flag:
-        response = requests.get(url)
-        page = BeautifulSoup(response.content, 'html.parser')
-
-        actions = page.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
-        for action in actions:
-            date_text = action.find('span', class_="text-base-dark padding-right-105").get_text(strip=True)
-            date_object = datetime.datetime.strptime(date_text, "%B %d, %Y")
-
-            if date_object < base_date_obj:
-                end_flag = False
-                break
-
-            title = action.find('h2', class_='usa-card__heading').get_text(strip=True)
-            link = action.find('h2', class_='usa-card__heading').find('a')['href']
-            full_link = f"{base_url}{link}"
-            category = action.find('ul', class_="display-inline add-list-reset").get_text(strip=True)
-
-            agency = "N/A"
-            try:
-                detail_response = requests.get(full_link)
-                detail_page = BeautifulSoup(detail_response.content, 'html.parser')
-                agency_tag = detail_page.find('ul', class_="usa-list usa-list--unstyled margin-y-2")
-                if agency_tag:
-                    for li in agency_tag.find_all('li'):
-                        if "Agency:" in li.get_text():
-                            agency = li.get_text().replace("Agency:", "").strip()
-                            break
-            except requests.exceptions.RequestException as e:
-                print(f"Error fetching agency details for {title}: {e}")
-
-            data.append({
-                'Title': title,
-                'Date': date_text,
-                'Category': category,
-                'Link': full_link,
-                'Agency': agency
-            })
-
-        sleep(1)
-        try:
-            next_page = page.find('li', class_='next-page').find('a')['href']
-            url = f"{base_url}{next_page}"
-        except AttributeError:
-            break
-
-    output_filename = f"enforcement_actions_{year}_{month:02}.csv"
-    df = pd.DataFrame(data)
-    df.to_csv(output_filename, index=False)
-    print(f"Data saved to {output_filename}")
-    print(df.head())  
-
-    return df
-
-df = dynamic_scraper(1, 2023)
-
-if not df.empty:
-    earliest_action = df.iloc[-1]
-    print("\nEarliest enforcement action scraped:")
-    print(f"Date: {earliest_action['Date']}")
-    print(f"Title: {earliest_action['Title']}")
-    print(f"Category: {earliest_action['Category']}")
-    print(f"Agency: {earliest_action['Agency']}")
-    print(f"Link: {earliest_action['Link']}")
-
-print(f"\nTotal enforcement actions collected: {len(df)}")
-```
 
 
-c.
+## Plot data based on scraped data (using Altair)
 
-```{python}
 
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
-from datetime import datetime
+### 1.
 
-def scrape_all_actions(base_url, start_date):
-    all_data = []
-    page_number = 1
-    date_reached = False
 
-    while not date_reached:
-        current_url = f"{base_url}?page={page_number}"
-        try:
-            response = requests.get(current_url)
-            if response.status_code != 200:
-                print(f"Failed to fetch data from {current_url}, status code: {response.status_code}")
-                break
-        except requests.exceptions.RequestException as e:
-            print(f"Request failed: {e}")
-            break
 
-        soup = BeautifulSoup(response.content, 'html.parser')
-        actions = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
+### 2.
 
-        for action in actions:
-            title_tag = action.find('h2', class_='usa-card__heading')
-            title = title_tag.get_text(strip=True) if title_tag else 'No Title Provided'
-            link = title_tag.find('a')['href'] if title_tag and title_tag.find('a') else 'No Link Provided'
-            link = f"https://oig.hhs.gov{link}" if link.startswith('/') else link
 
-            date_div = action.find('div', class_='font-body-sm margin-top-1')
-            date_text = date_div.find('span', class_='text-base-dark padding-right-105').get_text(strip=True) if date_div else ''
-            try:
-                date_obj = datetime.strptime(date_text, '%B %d, %Y')
-                if date_obj < start_date:
-                    date_reached = True
-                    break  # Break the inner loop if we reach before 2021
-            except ValueError:
-                print(f"Date parsing failed for: {date_text}")
-                continue  # Skip this entry if the date is invalid
 
-            category_ul = action.find('ul', class_='display-inline add-list-reset')
-            category = category_ul.find('li').get_text(strip=True) if category_ul and category_ul.find('li') else 'No Category Provided'
 
-            all_data.append({'Title': title, 'Date': date_text, 'Category': category, 'Link': link})
+## Create maps of enforcement activity
 
-        if not date_reached:
-            page_number += 1  # Increment page number only if we haven't reached the start date
 
-    return pd.DataFrame(all_data)
+### 1.
 
-# Base URL of the site to scrape
-base_url = 'https://oig.hhs.gov/fraud/enforcement/'
-start_date = datetime(2021, 1, 1)
 
-# Scrape the data
-final_df = scrape_all_actions(base_url, start_date)
-print("Total actions since January 2021:", len(final_df))
-earliest_action = final_df.sort_values(by='Date').iloc[0]
-print("Earliest enforcement action details:", earliest_action)
-```
+### 2.
+
+
+
+
+## Extra Credit: Calculate the enforcement actions on a per-capita basis
+
+### 1.
+
+
+
+### 2.
+
+
+
+### 3.
+
 
 the pseudo code:
 1. go thorugh every row in the original df
@@ -383,7 +245,6 @@ the pseudo code:
     II. if not 2021 or more, break out of loop (this is a loop inside of the bigger loop)
 3. for those whose date meet our requirement, go to the "link" column
 4. go over each link on every page and then if we are still within the desired timeframe, go to next online page
-c. 
 
 ## Plot data based on scraped data (using Altair)
 
