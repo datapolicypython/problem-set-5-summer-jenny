@@ -28,7 +28,7 @@ your initials to indicate your agreement: **SN** **JZ**
 
 ```{python}
 import csv
-from bs4 import BeautifulSoup
+form bs4 import BeautifulSoup
 import pandas as pd
 import requests
 import altair
