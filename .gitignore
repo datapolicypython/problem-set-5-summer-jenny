@@ -4,3 +4,5 @@
 # Ignore large data files
 *.csv
 *.shp
+
+*.DS_Store
