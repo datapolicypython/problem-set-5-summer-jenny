@@ -211,7 +211,7 @@ Agency: January 3, 2023
 Link: https://oig.hhs.gov/fraud/enforcement/podiatrist-pays-90000-to-settle-false-billing-allegations/
 
 ```{python}
-from datetime import datetime  # Import the datetime class directly
+from datetime import datetime 
 import requests
 from bs4 import BeautifulSoup
 import csv
@@ -220,47 +220,39 @@ from time import sleep
 
 def scrape_all_pages(base_url, month, year, output_file):
     page_number = 1
-    base_date_obj = datetime(year, month, 1)  # Now datetime refers to the class, not the module
+    base_date_obj = datetime(year, month, 1) 
     stop_scraping = False
 
-    # Open the CSV file in write mode initially to add headers
     with open(output_file, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.DictWriter(file, fieldnames=["Title", "Date", "Category", "Link"])
         writer.writeheader()  # Write the header row once
 
-        # Continue scraping until we hit the stopping condition
         while not stop_scraping:
             url = f"{base_url}?page={page_number}"
             response = requests.get(url)
             soup = BeautifulSoup(response.content, 'html.parser')
             actions = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
             
-            # If no actions are found, break out of the loop
             if not actions:
                 print(f"No more actions found on page {page_number}.")
                 break
 
             for action in actions:
-                # Extract title, link, date, and category
                 title = action.find('h2', class_='usa-card__heading').get_text(strip=True)
                 link = "https://oig.hhs.gov" + action.find('h2').find('a')['href']
                 date_text = action.find('span', class_='text-base-dark padding-right-105').get_text(strip=True)
                 date_object = datetime.strptime(date_text, "%B %d, %Y")
                 category = action.find('ul', class_="display-inline add-list-reset").get_text(strip=True)
                 
-                # Stop if the date is before January 2023
                 if date_object < base_date_obj:
                     stop_scraping = True
                     break
                 
-                # Write each action data directly to the CSV file
                 writer.writerow({'Title': title, 'Date': date_text, 'Category': category, 'Link': link})
             
-            # Increment page number to move to the next page
             page_number += 1
-            sleep(1)  # Pause to avoid server overload
-
-# Function to fetch agency names for each enforcement action link
+            sleep(1)  
+        
 def fetch_agency(link):
     try:
         response = requests.get(link)
@@ -273,13 +265,11 @@ def fetch_agency(link):
         print(f"Error fetching {link}: {e}")
     return 'N/A'
 
-# Function to get agency names and update CSV with agency data
 def add_agencies_to_csv(output_file):
     df = pd.read_csv(output_file)
     df['Agency'] = get_agencies(df)
     df.to_csv(output_file, index=False)
 
-# Function to get agencies concurrently for CSV
 def get_agencies(df):
     with ThreadPoolExecutor(max_workers=10) as executor:
         future_to_index = {executor.submit(fetch_agency, row['Link']): index for index, row in df.iterrows()}
@@ -289,14 +279,11 @@ def get_agencies(df):
             agencies[index] = future.result()
     return agencies
 
-# Main script
 base_url = 'https://oig.hhs.gov/fraud/enforcement/'
 output_file = "enforcement_actions_since_jan2023.csv"
 
-# Scrape all pages and write directly to CSV
 scrape_all_pages(base_url, 1, 2023, output_file)
 
-# Read back CSV and add Agency column
 add_agencies_to_csv(output_file)
 
 print("Data scraped and saved to enforcement_actions_since_jan2023.csv")
