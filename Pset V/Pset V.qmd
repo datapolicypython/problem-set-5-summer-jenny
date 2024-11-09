@@ -444,7 +444,9 @@ import geopandas as gpd
 print(df_2021.head())
 ```
 
+```{python}
 
+```
 
 ## Extra Credit: Calculate the enforcement actions on a per-capita basis
 
