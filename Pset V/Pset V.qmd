@@ -29,7 +29,16 @@ your initials to indicate your agreement: **__** **__**
 the problem set here”
 Late coins used this pset: **__** Late coins left after submission: **__**
 
-
+```{python}
+from bs4 import BeautifulSoup
+import pandas as pd
+import requests
+import altair
+import requests
+import datetime
+from time import sleep
+import os
+```
 
 ## Develop Initial scraper and crawler
 
@@ -164,9 +173,6 @@ print("Data scraped and saved to enforcement_actions_all_pages.csv")
 ```
 
 ```{python}
-##for jenny
-## since you need the date column to be a date, I will convert it for you
-
 final_df['Date'] = pd.to_datetime(final_df['Date'], errors='coerce')
 
 # Check the data type to confirm
@@ -174,56 +180,115 @@ print(final_df.dtypes)
 print(final_df.head())
 ```
 
-
-
 ## Making the scraper dynamic
 
 ### 1.
 
 a. 
-the pseudo code for writing the function will be like: 
-1. going thorugh every row in the df Summer has created. 
+Step 1: Set up function and input validation 
+Function: dynamic_scraper(month, year), month and year are parameters. Check if year is at least 2013; if not, print a warning and exit function. 
 
-2. extracting the dates from date column
+Step 2: Initialize URL and variables
+Set the base URL for the enforcement actions page. Initialize an empty list to store the data and create a datetime object, base_date_obj, to represent the starting date using month and year. Initialize end_flag as True to contol page looping. 
 
-3. there will be two types of date
+Step 3: Loop through pages until end condition
+Use a while loop that continues as long as end_flag is True. For each page, retrieve the HTML content and parse it using BeautifulSoup to locate the list of enforcement actions. 
 
-    I. after 2013 >> continue with the rest of function
+Step 4: Extract data from each enforcement action
+For each action on the page, extract: title, data (converted to datetime for comparison), category and link. If the date is older than base_date_obj, set end_flag to False to stop the loop. For each link, visit the details page to retrieve the agency, name. 
 
-    II. before 2013 >> show me an error sign that says this is before our desired timeline
+Step 5: Pause and continue to the next page
+Add a 1-second delay between pages to prevent server-side blockng. If a "next page" link exists, update the URL and continue, otherwise exit the loop. 
 
-4. save all the extracted dates on a csv file called "enfrocment_actions_month_year.csv"
+Step 6: Save data to CSV and print preview 
+Convert the collected data to a pandas DataFrame. Save the DataFrame to a CSV file named enforcement_actions_year_month.csv and print the first few rows for verification. 
 
-5. do not push it to git
+b. Based on the output, the total number of enforcement actions collected is 20. The date of the earliest enforcement actions is October 30th 2024. 
 
-6. print the head
-
-
-b.
+The details of the earliest enforcement action is "Quincy-Based Physician Group To Pay $650,000 To Resolve Allegations Of False Billing To MassHealth". 
 
 ```{python}
-desired_dates= []
-for index, row in final_df.iterrows():
-    date = row['Date']
+def dynamic_scraper(month, year):
+    if year < 2013:
+        print("Please enter a year greater than or equal to 2013.")
+        return
     
-    # Check if date is before or after 2013
-    if date.year >= 2013:
-        # If date is after 2013, add it to the list
-        desired_dates.append(date)
-    else:
-        # If date is before 2013, print an error message
-        print("outside desired period")
+    base_url = 'https://oig.hhs.gov'
+    url = f'{base_url}/fraud/enforcement/?page=1'
+    data = []
+    base_date_obj = datetime.datetime(year, month, 1)
+    end_flag = True
 
-# Create a new DataFrame to save the valid dates
-desired_dates_df = pd.DataFrame(desired_dates, columns=['Date'])
+    while end_flag:
+        response = requests.get(url)
+        page = BeautifulSoup(response.content, 'html.parser')
 
-desired_dates_df.to_csv("enforcement_actions_month_year.csv", index=False)
-print("Unique years in the data:", final_df['Date'].dt.year.unique())
+        actions = page.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
+        for action in actions:
+            date_text = action.find('span', class_="text-base-dark padding-right-105").get_text(strip=True)
+            date_object = datetime.datetime.strptime(date_text, "%B %d, %Y")
+
+            if date_object < base_date_obj:
+                end_flag = False
+                break
+
+            title = action.find('h2', class_='usa-card__heading').get_text(strip=True)
+            link = action.find('h2', class_='usa-card__heading').find('a')['href']
+            full_link = f"{base_url}{link}"
+            category = action.find('ul', class_="display-inline add-list-reset").get_text(strip=True)
+
+            agency = "N/A"
+            try:
+                detail_response = requests.get(full_link)
+                detail_page = BeautifulSoup(detail_response.content, 'html.parser')
+                agency_tag = detail_page.find('ul', class_="usa-list usa-list--unstyled margin-y-2")
+                if agency_tag:
+                    for li in agency_tag.find_all('li'):
+                        if "Agency:" in li.get_text():
+                            agency = li.get_text().replace("Agency:", "").strip()
+                            break
+            except requests.exceptions.RequestException as e:
+                print(f"Error fetching agency details for {title}: {e}")
+
+            data.append({
+                'Title': title,
+                'Date': date_text,
+                'Category': category,
+                'Link': full_link,
+                'Agency': agency
+            })
+
+        sleep(1)
+        try:
+            next_page = page.find('li', class_='next-page').find('a')['href']
+            url = f"{base_url}{next_page}"
+        except AttributeError:
+            break
+
+    output_filename = f"enforcement_actions_{year}_{month:02}.csv"
+    df = pd.DataFrame(data)
+    df.to_csv(output_filename, index=False)
+    print(f"Data saved to {output_filename}")
+    print(df.head())  
+
+    return df
+
+df = dynamic_scraper(1, 2023)
+
+if not df.empty:
+    earliest_action = df.iloc[-1]
+    print("\nEarliest enforcement action scraped:")
+    print(f"Date: {earliest_action['Date']}")
+    print(f"Title: {earliest_action['Title']}")
+    print(f"Category: {earliest_action['Category']}")
+    print(f"Agency: {earliest_action['Agency']}")
+    print(f"Link: {earliest_action['Link']}")
+
+print(f"\nTotal enforcement actions collected: {len(df)}")
 ```
 
 
-c.
-
+c. 
 ## Plot data based on scraped data (using Altair)
 
 
