@@ -263,7 +263,6 @@ print(f"Link: {earliest_action['Link']}")
 ```
 
 c. 
-
 ```{python}
 #using my partner's code to collect all data from 2021
 
