@@ -89,50 +89,77 @@ print( "number of items found is", len(final_df))
 ### 2.
 
 ```{python}
-# Initialize an empty list to store agency names
-agencies = []
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Loop through each link in final_df
-for index, row in final_df.iterrows():
-    link = row['Link']
-    if link:  # Only proceed if the link is valid
-        try:
-            response = requests.get(link)  # Request the page using the link
-            soup = BeautifulSoup(response.text, 'html.parser')  # Parse the content of the page
+def fetch_agency(link):
+    try:
+        response = requests.get(link)  # Request the page using the link
+        soup = BeautifulSoup(response.text, 'html.parser')  # Parse the content of the page
 
-            # Find all <ul> elements with the specified class containing the agency details
-            uls = soup.find_all("ul", class_="usa-list usa-list--unstyled margin-y-2")
-            
-            # Initialize a placeholder for the agency name
-            agency_name = 'N/A'
-            
-            # Iterate over each <ul> element
-            for ul in uls:
-                # Find all <span> elements within each <ul> that match the class
-                spans = ul.find_all("span", class_="padding-right-2 text-base")
-                
-                # Ensure there are enough <span> tags to avoid IndexError
-                if len(spans) > 1:
-                    agency = spans[1]  # Select the second <span>, which contains "Agency:"
-                    
-                    # Use next_sibling to access the text following the <span>
-                    agency_name = agency.next_sibling.strip() if agency.next_sibling else 'N/A'
-                    
-                    # Stop after finding the first matching <ul> and <span> structure
-                    break
-            
-            # Append the extracted agency name to the agencies list
-            agencies.append(agency_name)
+        # Find all <ul> elements with the specified class containing the agency details
+        uls = soup.find_all("ul", class_="usa-list usa-list--unstyled margin-y-2")
+        agency_name = 'N/A'  # Default if no agency info is found
 
-        except requests.exceptions.RequestException as e:
-            print(f"Error fetching {link}: {e}")
-            agencies.append('N/A')
+        # Iterate over each <ul> element
+        for ul in uls:
+            spans = ul.find_all("span", class_="padding-right-2 text-base")
+            if len(spans) > 1:
+                agency = spans[1]  # Select the second <span>, which contains "Agency:"
+                agency_name = agency.next_sibling.strip() if agency.next_sibling else 'N/A'
+                break  # Stop after finding the first matching <ul> and <span> structure
 
-# Add agency names to the DataFrame and print its head
-final_df['Agency'] = agencies  # Create a new column in our original df called Agency
-print(final_df.head(-5))
-##there is one row that has different agency info:
-# Manually correct the agency information for the second row
+        return agency_name
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching {link}: {e}")
+        return 'N/A'
+
+def clean_agency_data(agency):
+    # Check if the agency data contains a semicolon which might indicate the inclusion of a date
+    if ';' in agency:
+        parts = agency.split(';')
+        if len(parts) > 1:
+            return parts[1].strip()
+    return agency.strip()
+
+def get_agencies(df):
+    agencies = ['N/A'] * len(df)  # Initialize a list of 'N/A' for all agencies
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_index = {executor.submit(fetch_agency, row['Link']): index for index, row in df.iterrows() if row['Link']}
+        for future in as_completed(future_to_index):
+            index = future_to_index[future]
+            raw_agency = future.result()
+            cleaned_agency = clean_agency_data(raw_agency)  # Clean the agency data
+            agencies[index] = cleaned_agency
+    return agencies
+
+def scrape_all_pages(base_url, num_pages):
+    urls = [f"{base_url}?page={i}" for i in range(1, num_pages + 1)]
+    all_data = []
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(fetch_agency, urls))
+    for result in results:
+        all_data.extend(result)
+    return pd.DataFrame(all_data)
+
+# Base URL of the site to scrape
+base_url = 'https://oig.hhs.gov/fraud/enforcement/'
+
+# Determine the number of pages or set a fixed number if known
+num_pages = 482 
+
+# Scrape the data
+final_df = scrape_all_pages(base_url, num_pages)
+
+# Add cleaned agency data to DataFrame
+final_df['Agency'] = get_agencies(final_df)
+
+# Print the first few rows of the DataFrame to check
+print(final_df.head())
+
+# Save the DataFrame to a CSV file
+final_df.to_csv("enforcement_actions_all_pages.csv", index=False)
+print("Data scraped and saved to enforcement_actions_all_pages.csv")
 
 ```
 
