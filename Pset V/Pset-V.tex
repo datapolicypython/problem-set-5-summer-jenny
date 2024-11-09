@@ -217,14 +217,6 @@ initials to indicate your agreement: **\_\_** \textbf{\textbf{\textbf{
 worked with on the problem set here'' Late coins used this pset: }}}
 Late coins left after submission: **\_\_**
 
-\begin{Shaded}
-\begin{Highlighting}[]
-\ImportTok{from}\NormalTok{ bs4 }\ImportTok{import}\NormalTok{ BeautifulSoup}
-\ImportTok{import}\NormalTok{ pandas }\ImportTok{as}\NormalTok{ pd}
-\ImportTok{import}\NormalTok{ requests}
-\end{Highlighting}
-\end{Shaded}
-
 \subsection{Develop Initial scraper and
 crawler}\label{develop-initial-scraper-and-crawler}
 
@@ -232,46 +224,79 @@ crawler}\label{develop-initial-scraper-and-crawler}
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\CommentTok{\#doing the intial action to get the link parsed}
-\NormalTok{url }\OperatorTok{=} \StringTok{\textquotesingle{}https://oig.hhs.gov/fraud/enforcement/\textquotesingle{}} \CommentTok{\# the link we would be scraping}
-\NormalTok{requested }\OperatorTok{=}\NormalTok{ requests.get(url) }
-\NormalTok{soup }\OperatorTok{=}\NormalTok{ BeautifulSoup(requested.content, }\StringTok{\textquotesingle{}html.parser\textquotesingle{}}\NormalTok{)}
+\ImportTok{import}\NormalTok{ requests}
+\ImportTok{from}\NormalTok{ bs4 }\ImportTok{import}\NormalTok{ BeautifulSoup}
+\ImportTok{import}\NormalTok{ pandas }\ImportTok{as}\NormalTok{ pd}
+\ImportTok{import}\NormalTok{ time}
 
-\CommentTok{\# Find all actions based on the main \textless{}li\textgreater{} tag containing each card}
-\NormalTok{actions }\OperatorTok{=}\NormalTok{ soup.find\_all(}\StringTok{\textquotesingle{}li\textquotesingle{}}\NormalTok{, class\_}\OperatorTok{=}\StringTok{\textquotesingle{}usa{-}card card{-}{-}list pep{-}card{-}{-}minimal mobile:grid{-}col{-}12\textquotesingle{}}\NormalTok{)}
+\KeywordTok{def}\NormalTok{ scrape\_all\_pages(base\_url):}
+\NormalTok{    current\_url }\OperatorTok{=}\NormalTok{ base\_url  }\CommentTok{\# Start with the base URL}
+\NormalTok{    all\_data }\OperatorTok{=}\NormalTok{ []  }\CommentTok{\# List to store all scraped data}
 
-\NormalTok{dataset }\OperatorTok{=}\NormalTok{ [] }\CommentTok{\#creating an ampty list to store craped data}
+    \ControlFlowTok{while} \VariableTok{True}\NormalTok{:}
+\NormalTok{        response }\OperatorTok{=}\NormalTok{ requests.get(current\_url)}
+\NormalTok{        soup }\OperatorTok{=}\NormalTok{ BeautifulSoup(response.content, }\StringTok{\textquotesingle{}html.parser\textquotesingle{}}\NormalTok{)}
 
-\ControlFlowTok{for}\NormalTok{ items }\KeywordTok{in}\NormalTok{ actions:}
-\NormalTok{    title\_tag }\OperatorTok{=}\NormalTok{ items.find(}\StringTok{\textquotesingle{}h2\textquotesingle{}}\NormalTok{, class\_}\OperatorTok{=}\StringTok{\textquotesingle{}usa{-}card\_\_heading\textquotesingle{}}\NormalTok{) }\CommentTok{\#tag for the title of enforcement is h2}
-    \ControlFlowTok{if}\NormalTok{ title\_tag:}
-\NormalTok{        title }\OperatorTok{=}\NormalTok{ title\_tag.get\_text(strip}\OperatorTok{=}\VariableTok{True}\NormalTok{)  }
-\NormalTok{        link }\OperatorTok{=}\NormalTok{ title\_tag.find(}\StringTok{\textquotesingle{}a\textquotesingle{}}\NormalTok{)[}\StringTok{\textquotesingle{}href\textquotesingle{}}\NormalTok{] }\ControlFlowTok{if}\NormalTok{ title\_tag.find(}\StringTok{\textquotesingle{}a\textquotesingle{}}\NormalTok{) }\ControlFlowTok{else} \VariableTok{None} \CommentTok{\#the tag for hyperlinks}
-\NormalTok{        link }\OperatorTok{=} \SpecialStringTok{f"https://oig.hhs.gov}\SpecialCharTok{\{}\NormalTok{link}\SpecialCharTok{\}}\SpecialStringTok{"} \ControlFlowTok{if}\NormalTok{ link }\ControlFlowTok{else} \VariableTok{None}  \CommentTok{\# Complete relative link}
+        \CommentTok{\# Find all actions based on the main \textless{}li\textgreater{} tag containing each card}
+\NormalTok{        actions }\OperatorTok{=}\NormalTok{ soup.find\_all(}\StringTok{\textquotesingle{}li\textquotesingle{}}\NormalTok{, class\_}\OperatorTok{=}\StringTok{\textquotesingle{}usa{-}card card{-}{-}list pep{-}card{-}{-}minimal mobile:grid{-}col{-}12\textquotesingle{}}\NormalTok{)}
 
-    \CommentTok{\#looking for dates}
-\NormalTok{    date\_tag }\OperatorTok{=}\NormalTok{ items.find(}\KeywordTok{lambda}\NormalTok{ tag: tag.name }\OperatorTok{==} \StringTok{"span"} \KeywordTok{and} \StringTok{"text{-}base{-}dark"} \KeywordTok{in}\NormalTok{ tag.get(}\StringTok{"class"}\NormalTok{, []) }\KeywordTok{and} \StringTok{"padding{-}right{-}105"} \KeywordTok{in}\NormalTok{ tag.get(}\StringTok{"class"}\NormalTok{, []))}
-\NormalTok{    date }\OperatorTok{=}\NormalTok{ date\_tag.get\_text(strip}\OperatorTok{=}\VariableTok{True}\NormalTok{) }\ControlFlowTok{if}\NormalTok{ date\_tag }\ControlFlowTok{else} \VariableTok{None}
+        \ControlFlowTok{for}\NormalTok{ action }\KeywordTok{in}\NormalTok{ actions:}
+\NormalTok{            title\_tag }\OperatorTok{=}\NormalTok{ action.find(}\StringTok{\textquotesingle{}h2\textquotesingle{}}\NormalTok{, class\_}\OperatorTok{=}\StringTok{\textquotesingle{}usa{-}card\_\_heading\textquotesingle{}}\NormalTok{)}
+\NormalTok{            title }\OperatorTok{=}\NormalTok{ title\_tag.get\_text(strip}\OperatorTok{=}\VariableTok{True}\NormalTok{) }\ControlFlowTok{if}\NormalTok{ title\_tag }\ControlFlowTok{else} \StringTok{\textquotesingle{}No Title Provided\textquotesingle{}}
+            
+\NormalTok{            link }\OperatorTok{=}\NormalTok{ title\_tag.find(}\StringTok{\textquotesingle{}a\textquotesingle{}}\NormalTok{)[}\StringTok{\textquotesingle{}href\textquotesingle{}}\NormalTok{] }\ControlFlowTok{if}\NormalTok{ title\_tag }\KeywordTok{and}\NormalTok{ title\_tag.find(}\StringTok{\textquotesingle{}a\textquotesingle{}}\NormalTok{) }\ControlFlowTok{else} \StringTok{\textquotesingle{}No Link Provided\textquotesingle{}}
+\NormalTok{            link }\OperatorTok{=} \SpecialStringTok{f"https://oig.hhs.gov}\SpecialCharTok{\{}\NormalTok{link}\SpecialCharTok{\}}\SpecialStringTok{"} \ControlFlowTok{if}\NormalTok{ link.startswith(}\StringTok{\textquotesingle{}/\textquotesingle{}}\NormalTok{) }\ControlFlowTok{else}\NormalTok{ link}
 
-    \CommentTok{\#now we will be looking for category}
-\NormalTok{    category\_tag }\OperatorTok{=}\NormalTok{ items.find(}\KeywordTok{lambda}\NormalTok{ tag: tag.name }\OperatorTok{==} \StringTok{"ul"} \KeywordTok{and} \StringTok{"display{-}inline"} \KeywordTok{in}\NormalTok{ tag.get(}\StringTok{"class"}\NormalTok{, []) }\KeywordTok{and} \StringTok{"add{-}list{-}reset"} \KeywordTok{in}\NormalTok{ tag.get(}\StringTok{"class"}\NormalTok{, []))}
-\NormalTok{    category }\OperatorTok{=} \VariableTok{None}
-    \ControlFlowTok{if}\NormalTok{ category\_tag:}
-\NormalTok{        li\_tag }\OperatorTok{=}\NormalTok{ category\_tag.find(}\KeywordTok{lambda}\NormalTok{ tag: tag.name }\OperatorTok{==} \StringTok{"li"} \KeywordTok{and} \StringTok{"display{-}inline{-}block"} \KeywordTok{in}\NormalTok{ tag.get(}\StringTok{"class"}\NormalTok{, []) }\KeywordTok{and} \StringTok{"usa{-}tag"} \KeywordTok{in}\NormalTok{ tag.get(}\StringTok{"class"}\NormalTok{, []))}
-\NormalTok{        category }\OperatorTok{=}\NormalTok{ li\_tag.get\_text(strip}\OperatorTok{=}\VariableTok{True}\NormalTok{) }\ControlFlowTok{if}\NormalTok{ li\_tag }\ControlFlowTok{else} \VariableTok{None}
+            \CommentTok{\# Correctly extract the date from the new structure}
+\NormalTok{            date\_div }\OperatorTok{=}\NormalTok{ action.find(}\StringTok{\textquotesingle{}div\textquotesingle{}}\NormalTok{, class\_}\OperatorTok{=}\StringTok{\textquotesingle{}font{-}body{-}sm margin{-}top{-}1\textquotesingle{}}\NormalTok{)}
+\NormalTok{            date }\OperatorTok{=}\NormalTok{ date\_div.find(}\StringTok{\textquotesingle{}span\textquotesingle{}}\NormalTok{, class\_}\OperatorTok{=}\StringTok{\textquotesingle{}text{-}base{-}dark padding{-}right{-}105\textquotesingle{}}\NormalTok{).get\_text(strip}\OperatorTok{=}\VariableTok{True}\NormalTok{) }\ControlFlowTok{if}\NormalTok{ date\_div }\ControlFlowTok{else} \StringTok{\textquotesingle{}No Date Provided\textquotesingle{}}
+            
+            \CommentTok{\# Correctly extract the category from the new structure}
+\NormalTok{            category\_ul }\OperatorTok{=}\NormalTok{ action.find(}\StringTok{\textquotesingle{}ul\textquotesingle{}}\NormalTok{, class\_}\OperatorTok{=}\StringTok{\textquotesingle{}display{-}inline add{-}list{-}reset\textquotesingle{}}\NormalTok{)}
+\NormalTok{            category }\OperatorTok{=}\NormalTok{ category\_ul.find(}\StringTok{\textquotesingle{}li\textquotesingle{}}\NormalTok{).get\_text(strip}\OperatorTok{=}\VariableTok{True}\NormalTok{) }\ControlFlowTok{if}\NormalTok{ category\_ul }\ControlFlowTok{else} \StringTok{\textquotesingle{}No Category Provided\textquotesingle{}}
 
-    \CommentTok{\# Append data to dataset}
-\NormalTok{    dataset.append(\{}
-        \StringTok{\textquotesingle{}Title\textquotesingle{}}\NormalTok{: title, }
-        \StringTok{\textquotesingle{}Date\textquotesingle{}}\NormalTok{: date, }
-        \StringTok{\textquotesingle{}Category\textquotesingle{}}\NormalTok{: category, }
-        \StringTok{\textquotesingle{}Link\textquotesingle{}}\NormalTok{: link }
-\NormalTok{    \})}
+\NormalTok{            all\_data.append(\{}
+                \StringTok{\textquotesingle{}Title\textquotesingle{}}\NormalTok{: title,}
+                \StringTok{\textquotesingle{}Date\textquotesingle{}}\NormalTok{: date,}
+                \StringTok{\textquotesingle{}Category\textquotesingle{}}\NormalTok{: category,}
+                \StringTok{\textquotesingle{}Link\textquotesingle{}}\NormalTok{: link}
+\NormalTok{            \})}
 
-\NormalTok{final\_df }\OperatorTok{=}\NormalTok{ pd.DataFrame(dataset)}
-\BuiltInTok{print}\NormalTok{(final\_df.head(}\DecValTok{5}\NormalTok{))}
+        \CommentTok{\# Find the second \textquotesingle{}ul\textquotesingle{} which contains the pagination and access the 6th \textquotesingle{}li\textquotesingle{} for the next link}
+\NormalTok{        pagination }\OperatorTok{=}\NormalTok{ soup.find\_all(}\StringTok{\textquotesingle{}ul\textquotesingle{}}\NormalTok{, class\_}\OperatorTok{=}\StringTok{\textquotesingle{}pagination\textquotesingle{}}\NormalTok{)}
+        \ControlFlowTok{if} \BuiltInTok{len}\NormalTok{(pagination) }\OperatorTok{\textgreater{}=} \DecValTok{2} \KeywordTok{and} \BuiltInTok{len}\NormalTok{(pagination[}\DecValTok{1}\NormalTok{].find\_all(}\StringTok{\textquotesingle{}li\textquotesingle{}}\NormalTok{)) }\OperatorTok{\textgreater{}=} \DecValTok{6}\NormalTok{:}
+\NormalTok{            next\_page\_li }\OperatorTok{=}\NormalTok{ pagination[}\DecValTok{1}\NormalTok{].find\_all(}\StringTok{\textquotesingle{}li\textquotesingle{}}\NormalTok{)[}\DecValTok{5}\NormalTok{]  }\CommentTok{\# The sixth \textless{}li\textgreater{} in the second \textless{}ul\textgreater{}}
+\NormalTok{            next\_link }\OperatorTok{=}\NormalTok{ next\_page\_li.find(}\StringTok{\textquotesingle{}a\textquotesingle{}}\NormalTok{)}
+            \ControlFlowTok{if}\NormalTok{ next\_link }\KeywordTok{and} \StringTok{\textquotesingle{}href\textquotesingle{}} \KeywordTok{in}\NormalTok{ next\_link.attrs:}
+\NormalTok{                current\_url }\OperatorTok{=} \SpecialStringTok{f"https://oig.hhs.gov}\SpecialCharTok{\{}\NormalTok{next\_link[}\StringTok{\textquotesingle{}href\textquotesingle{}}\NormalTok{]}\SpecialCharTok{\}}\SpecialStringTok{"}
+            \ControlFlowTok{else}\NormalTok{:}
+                \ControlFlowTok{break}  \CommentTok{\# Stop if no next link}
+        \ControlFlowTok{else}\NormalTok{:}
+            \ControlFlowTok{break}  \CommentTok{\# Stop if pagination is missing or not enough items}
+
+\NormalTok{        time.sleep(}\DecValTok{1}\NormalTok{)  }\CommentTok{\# Sleep for 1 second between page requests to be polite to the server}
+
+    \ControlFlowTok{return}\NormalTok{ pd.DataFrame(all\_data)}
+
+\CommentTok{\# Base URL of the site to scrape}
+\NormalTok{base\_url }\OperatorTok{=} \StringTok{\textquotesingle{}https://oig.hhs.gov/fraud/enforcement/\textquotesingle{}}
+
+\CommentTok{\# Scrape the data}
+\NormalTok{final\_df }\OperatorTok{=}\NormalTok{ scrape\_all\_pages(base\_url)}
+
+\CommentTok{\# Print the first few rows of the DataFrame to check}
+\BuiltInTok{print}\NormalTok{(final\_df.head())}
+
+\CommentTok{\# Save the DataFrame to a CSV file}
+\NormalTok{final\_df.to\_csv(}\StringTok{"enforcement\_actions\_all\_pages.csv"}\NormalTok{, index}\OperatorTok{=}\VariableTok{False}\NormalTok{)}
+\BuiltInTok{print}\NormalTok{(}\StringTok{"Data scraped and saved to enforcement\_actions\_all\_pages.csv"}\NormalTok{)}
 \end{Highlighting}
 \end{Shaded}
+
+\begin{verbatim}
+/Users/samarnegahdar/Desktop/untitled folder/problem-set-5-summer-jenny/Pset V/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+\end{verbatim}
 
 \begin{verbatim}
                                                Title              Date  \
@@ -294,6 +319,7 @@ crawler}\label{develop-initial-scraper-and-crawler}
 2  https://oig.hhs.gov/fraud/enforcement/former-t...  
 3  https://oig.hhs.gov/fraud/enforcement/former-a...  
 4  https://oig.hhs.gov/fraud/enforcement/paroled-...  
+Data scraped and saved to enforcement_actions_all_pages.csv
 \end{verbatim}
 
 \subsubsection{2.}\label{section-1}
@@ -429,12 +455,17 @@ dynamic}\label{making-the-scraper-dynamic}
 
 \subsubsection{1.}\label{section-2}
 
-the pseudo code for writing the function will be like: 1. going thorugh
-every row in the df Summer has created.
+\begin{enumerate}
+\def\labelenumi{\alph{enumi}.}
+\tightlist
+\item
+  the pseudo code for writing the function will be like:
+\end{enumerate}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
-\setcounter{enumi}{1}
+\item
+  going thorugh every row in the df Summer has created.
 \item
   extracting the dates from date column
 \item
@@ -462,9 +493,41 @@ every row in the df Summer has created.
 
 \begin{enumerate}
 \def\labelenumi{\alph{enumi}.}
+\setcounter{enumi}{1}
 \tightlist
 \item
-\item
+\end{enumerate}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{desired\_dates}\OperatorTok{=}\NormalTok{ []}
+\ControlFlowTok{for}\NormalTok{ index, row }\KeywordTok{in}\NormalTok{ final\_df.iterrows():}
+\NormalTok{    date }\OperatorTok{=}\NormalTok{ row[}\StringTok{\textquotesingle{}Date\textquotesingle{}}\NormalTok{]}
+    
+    \CommentTok{\# Check if date is before or after 2013}
+    \ControlFlowTok{if}\NormalTok{ date.year }\OperatorTok{\textgreater{}=} \DecValTok{2013}\NormalTok{:}
+        \CommentTok{\# If date is after 2013, add it to the list}
+\NormalTok{        desired\_dates.append(date)}
+    \ControlFlowTok{else}\NormalTok{:}
+        \CommentTok{\# If date is before 2013, print an error message}
+        \BuiltInTok{print}\NormalTok{(}\StringTok{"outside desired period"}\NormalTok{)}
+
+\CommentTok{\# Create a new DataFrame to save the valid dates}
+\NormalTok{desired\_dates\_df }\OperatorTok{=}\NormalTok{ pd.DataFrame(desired\_dates, columns}\OperatorTok{=}\NormalTok{[}\StringTok{\textquotesingle{}Date\textquotesingle{}}\NormalTok{])}
+
+\NormalTok{desired\_dates\_df.to\_csv(}\StringTok{"enforcement\_actions\_month\_year.csv"}\NormalTok{, index}\OperatorTok{=}\VariableTok{False}\NormalTok{)}
+\BuiltInTok{print}\NormalTok{(}\StringTok{"Unique years in the data:"}\NormalTok{, final\_df[}\StringTok{\textquotesingle{}Date\textquotesingle{}}\NormalTok{].dt.year.unique())}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+Unique years in the data: [2024]
+\end{verbatim}
+
+\begin{enumerate}
+\def\labelenumi{\alph{enumi}.}
+\setcounter{enumi}{2}
+\tightlist
 \item
 \end{enumerate}
 
