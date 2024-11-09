@@ -22,12 +22,10 @@ execute:
 
 ---
 Partner 1: Summer Negahdar(samarneg)
-Partner 2: 
+Partner 2: Jenny Zhong (jzhong1)
 This submission is our work alone and complies with the 30538 integrity policy.” Add
-your initials to indicate your agreement: **__** **__**
-“I have uploaded the names of anyone else other than my partner and I worked with on
-the problem set here”
-Late coins used this pset: **__** Late coins left after submission: **__**
+your initials to indicate your agreement: **SN** **JZ**
+“I have uploaded the names of anyone else other than my partner and I worked with on the problem set here”
 
 ```{python}
 from bs4 import BeautifulSoup
