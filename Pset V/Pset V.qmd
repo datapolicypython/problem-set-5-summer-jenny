@@ -28,6 +28,7 @@ your initials to indicate your agreement: **SN** **JZ**
 “I have uploaded the names of anyone else other than my partner and I worked with on the problem set here”
 
 ```{python}
+import csv
 from bs4 import BeautifulSoup
 import pandas as pd
 import requests
@@ -49,7 +50,7 @@ def fetch_page_data(url):
     response = requests.get(url)
     if response.status_code != 200:
         print(f"Failed to fetch data from {url}")
-        return []  # Return empty list for this page if failed to fetch data
+        return []  # Return empty list if failed to fetch data
 
     soup = BeautifulSoup(response.content, 'html.parser')
     data = []
@@ -72,77 +73,59 @@ def fetch_page_data(url):
         data.append({'Title': title, 'Date': date, 'Category': category, 'Link': link})
     return data
 
-def scrape_all_pages(base_url, num_pages):
-    urls = [f"{base_url}?page={i}" for i in range(1, num_pages + 1)]
-    all_data = []
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        results = list(executor.map(fetch_page_data, urls))
-    for result in results:
-        all_data.extend(result)
-    return pd.DataFrame(all_data)
-
 # Base URL of the site to scrape
 base_url = 'https://oig.hhs.gov/fraud/enforcement/'
 
-# Define the number of pages you want to scrape
-num_pages = 482  
-# Scrape the data
-final_df = scrape_all_pages(base_url, num_pages)
+# Fetch data from the first page only
+first_page_data = fetch_page_data(base_url)
 
-# Print the first few rows of the DataFrame to check
-print(final_df.head())
 
-# Save the DataFrame to a CSV file
-final_df.to_csv("enforcement_actions_all_pages.csv", index=False)
-print("Data scraped and saved to enforcement_actions_all_pages.csv")
+df = pd.DataFrame(first_page_data)
+
+# this scraping is only done on the first page!
+print(df.head(5))
 ```
 
 ### 2.
 
 ```{python}
-# Initialize an empty list to store agency names
-agencies = []
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Loop through each link in final_df
-for index, row in final_df.iterrows():
-    link = row['Link']
-    if link:  # Only proceed if the link is valid
-        try:
-            response = requests.get(link)  # Request the page using the link
-            time.sleep(1)
-            soup = BeautifulSoup(response.text, 'html.parser')  # Parse the content of the page
-
-            # Find all <ul> elements with the specified class containing the agency details
+def fetch_agency_details(link):
+    """ Fetches the agency details for a given URL """
+    try:
+        response = requests.get(link, timeout=10)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
             uls = soup.find_all("ul", class_="usa-list usa-list--unstyled margin-y-2")
-            
-            # Initialize a placeholder for the agency name
-            agency_name = 'N/A'
-            
-            # Iterate over each <ul> element
             for ul in uls:
-                # Find all <span> elements within each <ul> that match the class
                 spans = ul.find_all("span", class_="padding-right-2 text-base")
-                
-                # Ensure there are enough <span> tags to avoid IndexError
                 if len(spans) > 1:
-                    agency = spans[1]  # Select the second <span>, which contains "Agency:"
-                    
-                    # Use next_sibling to access the text following the <span>
-                    agency_name = agency.next_sibling.strip() if agency.next_sibling else 'N/A'
-                    
-                    # Stop after finding the first matching <ul> and <span> structure
-                    break
-            
-            # Append the extracted agency name to the agencies list
-            agencies.append(agency_name)
+                    agency = spans[1]
+                    return agency.next_sibling.strip() if agency.next_sibling else 'N/A'
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching {link}: {e}")
+    return 'N/A'
 
-        except requests.exceptions.RequestException as e:
-            print(f"Error fetching {link}: {e}")
-            agencies.append('N/A')
+def process_agencies(df):
+    """ Process each link concurrently and fetch agency details """
+    links = df['Link'].tolist()
+    agencies = []
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(fetch_agency_details, link): link for link in links}
+        for future in as_completed(futures):
+            agencies.append(future.result())
+    return agencies
 
-# Add agency names to the DataFrame and print its head
-final_df['Agency'] = agencies  # Create a new column in our original df called Agency
-print(final_df.head(5))
+# Assuming df is already loaded with the first page data and contains 'Link'
+if 'Link' in df:
+    df['Agency'] = process_agencies(df)
+    print(df.head(5))
+
+# Parse dates and check data types
+df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+print(df.dtypes)
+print(df.head())
 ```
 
 ```{python}
@@ -151,6 +134,7 @@ final_df['Date'] = pd.to_datetime(final_df['Date'])
 # Check the data type to confirm
 print(df.dtypes)
 print(df.head())
+print(len(df))
 ```
 
 ## Making the scraper dynamic
@@ -187,6 +171,7 @@ Link: https://oig.hhs.gov/fraud/enforcement/podiatrist-pays-90000-to-settle-fals
 
 ```{python}
 from time import sleep
+from datetime import datetime
 
 def scrape_all_pages(base_url, month, year, output_file):
     page_number = 1
