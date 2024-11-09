@@ -294,7 +294,32 @@ print(f"Link: {earliest_action_2021['Link']}")
 ## Plot data based on scraped data (using Altair)
 
 ### 1.
+```{python}
+import altair as alt
 
+df_2021 = pd.read_csv("enforcement_actions_since_jan2021.csv")
+
+df_2021['Date'] = pd.to_datetime(df_2021['Date'], errors='coerce')
+
+print(df_2021.head)
+
+df_2021 = df_2021.dropna(subset=['Date'])
+
+df_2021['YearMonth'] = df_2021['Date'].dt.to_period('M')
+monthly_counts = df_2021.groupby('YearMonth').size().reset_index(name='ActionCount')
+monthly_counts['YearMonth'] = monthly_counts['YearMonth'].dt.to_timestamp()
+
+chart_step31 = alt.Chart(monthly_counts).mark_line(point=True).encode(
+    x=alt.X('YearMonth:T', title='Date (Month-Year)'),
+    y=alt.Y('ActionCount:Q', title='Number of Enforcement Actions')
+).properties(
+    title="Number of Enforcement Actions Over Time (Monthly Aggregation)",
+    width=600,
+    height=400
+)
+
+chart_step31.display()
+```
 
 
 ### 2.
@@ -321,8 +346,6 @@ df_2021['grouped category'] = df_2021['Title'].apply(categorize_title)
 # Grouping data by Category, Topic, and count by month
 grouped_data = df_2021.groupby('grouped category').resample('M', on='Date').size().unstack(level=[0, 1], fill_value=0)
 ```
-
-
 
 
 ## Create maps of enforcement activity
