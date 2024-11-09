@@ -534,7 +534,6 @@ ax.axis('equal')
 plt.show()
 ```
 
-
 ## Extra Credit: Calculate the enforcement actions on a per-capita basis
 
 ### 1.
