@@ -23,8 +23,9 @@ execute:
 ---
 Partner 1: Summer Negahdar(samarneg)
 Partner 2: Jenny Zhong (jzhong1)
-This submission is our work alone and complies with the 30538 integrity policy.” Add
-your initials to indicate your agreement: **SN** **JZ**
+This submission is our work alone and complies with the 30538 integrity policy.” Add your initials to indicate your agreement: **SN** **JZ**
+
+we have been facing some bugs when scraping. it either does not show the link or the agency or when we subset it for the years 2021 onwards, it takes aways either of this columns. with that, we have decided to just submit it as it is since through trying to modify it other parts of the code broke (you can check our git history) therefore we have decided not to move forward with the mapping section as it requires data form other parts that are not performable
 
 ```{python}
 import csv
@@ -43,7 +44,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 ### 1.
 ```{python}
-
+| eval: false
 def fetch_page_data(url):
     response = requests.get(url)
     if response.status_code != 200:
@@ -87,6 +88,7 @@ print(df.head(5))
 ### 2.
 
 ```{python}
+| eval: false
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def fetch_agency_details(link):
@@ -168,6 +170,7 @@ Agency:
 Link: https://oig.hhs.gov/fraud/enforcement/podiatrist-pays-90000-to-settle-false-billing-allegations/
 
 ```{python}
+| eval: false
 from time import sleep
 from datetime import datetime
 import time
@@ -255,6 +258,7 @@ if df is not None:
 
 Checking the number of rows and the details. 
 ```{python}
+| eval: false
 output_file = "enforcement_actions_since_2023_1.csv" 
 df = pd.read_csv(output_file)
 
@@ -275,6 +279,7 @@ print(f"Link: {earliest_action['Link']}")
 
 c. 
 ```{python}
+| eval: false
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -390,6 +395,7 @@ chart_step31 = alt.Chart(monthly_counts).mark_line(point=True).encode(
 chart_step31.display()
 ```
 
+![Number of enforcement actions over time](q31.png)
 
 ### 2.
 ```{python}
@@ -430,12 +436,11 @@ chart32 = alt.Chart(monthly_counts).mark_line(point=True).encode(
 chart32.display()
 ```
 
+![Number of enforcement actions by subcategory over time](q32.png)
 
 ## Create maps of enforcement activity
 
 ### 1.
-
-
 
 ### 2.
 ```{python}
@@ -445,17 +450,7 @@ print(df_2021.head())
 ```
 
 ```{python}
+usattorney = gpd.read_file("42data.shp")
 
+I ran into the same error as before although it was fixed and I could not debug. My apologies: CRSError: Invalid projection: EPSG:4326: (Internal Proj Error: proj_create: no database context specified)
 ```
-
-## Extra Credit: Calculate the enforcement actions on a per-capita basis
-
-### 1.
-
-
-
-### 2.
-
-
-
-### 3.
