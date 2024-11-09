@@ -289,6 +289,7 @@ print(f"\nTotal enforcement actions collected: {len(df)}")
 
 
 c. 
+
 ## Plot data based on scraped data (using Altair)
 
 
