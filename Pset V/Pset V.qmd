@@ -145,8 +145,22 @@ print(final_df.head())
 
 ### 1.
 
+the pseudo code for writing the function will be like: 
+1. going thorugh every row in the df Summer has created. 
 
+2. extracting the dates from date column
 
+3. there will be two types of date
+
+    I. after 2013 >> continue with the rest of function
+
+    II. before 2013 >> show me an error sign that says this is before our desired timeline
+
+4. save all the extracted dates on a csv file called "enfrocment_actions_month_year.csv"
+
+5. do not push it to git
+
+6. print the head
 
 
 
