@@ -25,7 +25,6 @@ Partner 1: Summer Negahdar(samarneg)
 Partner 2: Jenny Zhong (jzhong1)
 This submission is our work alone and complies with the 30538 integrity policy.” Add
 your initials to indicate your agreement: **SN** **JZ**
-“I have uploaded the names of anyone else other than my partner and I worked with on the problem set here”
 
 ```{python}
 import csv
@@ -349,16 +348,3 @@ grouped_data = df_2021.groupby('grouped category').resample('M', on='Date').size
 
 
 ### 3.
-
-
-
-
-
-
-
-
-
-
-
-
-
