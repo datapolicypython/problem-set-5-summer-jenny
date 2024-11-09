@@ -29,56 +29,61 @@ your initials to indicate your agreement: **__** **__**
 the problem set here”
 Late coins used this pset: **__** Late coins left after submission: **__**
 
-```{python}
-from bs4 import BeautifulSoup
-import pandas as pd
-import requests
 
-```
 
 ## Develop Initial scraper and crawler
 
 ### 1.
 
 ```{python}
-#doing the intial action to get the link parsed
-url = 'https://oig.hhs.gov/fraud/enforcement/' # the link we would be scraping
-requested = requests.get(url) 
-soup = BeautifulSoup(requested.content, 'html.parser')
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from concurrent.futures import ThreadPoolExecutor
+import time
 
-# Find all actions based on the main <li> tag containing each card
-actions = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
+def fetch_page_data(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+    data = []
+    actions = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
+    for action in actions:
+        title_tag = action.find('h2', class_='usa-card__heading')
+        title = title_tag.get_text(strip=True) if title_tag else 'No Title Provided'
+        
+        link = title_tag.find('a')['href'] if title_tag and title_tag.find('a') else 'No Link Provided'
+        link = f"https://oig.hhs.gov{link}" if link.startswith('/') else link
 
-dataset = [] #creating an ampty list to store craped data
+        # Correctly locate the date using the new structure
+        date_div = action.find('div', class_='font-body-sm margin-top-1')
+        date = date_div.find('span', class_='text-base-dark padding-right-105').get_text(strip=True) if date_div else 'No Date Provided'
+        
+        # Correctly locate the category using the new structure
+        category_ul = action.find('ul', class_='display-inline add-list-reset')
+        category = category_ul.find('li').get_text(strip=True) if category_ul and category_ul.find('li') else 'No Category Provided'
 
-for items in actions:
-    title_tag = items.find('h2', class_='usa-card__heading') #tag for the title of enforcement is h2
-    if title_tag:
-        title = title_tag.get_text(strip=True)  
-        link = title_tag.find('a')['href'] if title_tag.find('a') else None #the tag for hyperlinks
-        link = f"https://oig.hhs.gov{link}" if link else None  # Complete relative link
+        data.append({'Title': title, 'Date': date, 'Category': category, 'Link': link})
+    return data
 
-    #looking for dates
-    date_tag = items.find(lambda tag: tag.name == "span" and "text-base-dark" in tag.get("class", []) and "padding-right-105" in tag.get("class", []))
-    date = date_tag.get_text(strip=True) if date_tag else None
+def scrape_all_pages(base_url, num_pages):
+    urls = [f"{base_url}?page={i}" for i in range(1, num_pages + 1)]
+    all_data = []
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        results = list(executor.map(fetch_page_data, urls))
+    for result in results:
+        all_data.extend(result)
+    return pd.DataFrame(all_data)
 
-    #now we will be looking for category
-    category_tag = items.find(lambda tag: tag.name == "ul" and "display-inline" in tag.get("class", []) and "add-list-reset" in tag.get("class", []))
-    category = None
-    if category_tag:
-        li_tag = category_tag.find(lambda tag: tag.name == "li" and "display-inline-block" in tag.get("class", []) and "usa-tag" in tag.get("class", []))
-        category = li_tag.get_text(strip=True) if li_tag else None
+# Base URL of the site to scrape
+base_url = 'https://oig.hhs.gov/fraud/enforcement/'
 
-    # Append data to dataset
-    dataset.append({
-        'Title': title, 
-        'Date': date, 
-        'Category': category, 
-        'Link': link 
-    })
+num_pages = 482  
 
-final_df = pd.DataFrame(dataset)
-print(final_df.head(5))
+# Scrape the data
+final_df = scrape_all_pages(base_url, num_pages)
+
+print(final_df.head(-5))
+print( "number of items found is", len(final_df))
 ```
 
 ### 2.
@@ -125,7 +130,10 @@ for index, row in final_df.iterrows():
 
 # Add agency names to the DataFrame and print its head
 final_df['Agency'] = agencies  # Create a new column in our original df called Agency
-print(final_df.head(5))
+print(final_df.head(-5))
+##there is one row that has different agency info:
+# Manually correct the agency information for the second row
+
 ```
 
 ```{python}
@@ -145,6 +153,7 @@ print(final_df.head())
 
 ### 1.
 
+a. 
 the pseudo code for writing the function will be like: 
 1. going thorugh every row in the df Summer has created. 
 
@@ -163,11 +172,27 @@ the pseudo code for writing the function will be like:
 6. print the head
 
 
-
-a.
-
-
 b.
+
+```{python}
+desired_dates= []
+for index, row in final_df.iterrows():
+    date = row['Date']
+    
+    # Check if date is before or after 2013
+    if date.year >= 2013:
+        # If date is after 2013, add it to the list
+        desired_dates.append(date)
+    else:
+        # If date is before 2013, print an error message
+        print("outside desired period")
+
+# Create a new DataFrame to save the valid dates
+desired_dates_df = pd.DataFrame(desired_dates, columns=['Date'])
+
+desired_dates_df.to_csv("enforcement_actions_month_year.csv", index=False)
+print("Unique years in the data:", final_df['Date'].dt.year.unique())
+```
 
 
 c.
