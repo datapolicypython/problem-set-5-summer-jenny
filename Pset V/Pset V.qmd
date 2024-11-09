@@ -164,64 +164,63 @@ Earliest enforcement action scraped:
 Date: 2023-01-03 00:00:00
 Title: Podiatrist Pays $90,000 To Settle False Billing Allegations
 Category: Criminal and Civil Actions
-Agency: January 3, 2023
+Agency: 
 Link: https://oig.hhs.gov/fraud/enforcement/podiatrist-pays-90000-to-settle-false-billing-allegations/
 
 ```{python}
 from time import sleep
 from datetime import datetime
+import time
 
-def scrape_all_pages(base_url, month, year, output_file):
+def scrape_all_pages(base_url, base_date_obj):
+    all_data = []
     page_number = 1
-    base_date_obj = datetime(year, month, 1) 
     stop_scraping = False
 
-    with open(output_file, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.DictWriter(file, fieldnames=["Title", "Date", "Category", "Link"])
-        writer.writeheader()  # Write the header row once
+    while not stop_scraping:
+        url = f"{base_url}?page={page_number}"
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        actions = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
 
-        while not stop_scraping:
-            url = f"{base_url}?page={page_number}"
-            response = requests.get(url)
-            soup = BeautifulSoup(response.content, 'html.parser')
-            actions = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
-            
-            if not actions:
-                print(f"No more actions found on page {page_number}.")
+        if not actions:
+            break  
+
+        for action in actions:
+            title_tag = action.find('h2', class_='usa-card__heading').find('a')
+            title = title_tag.get_text(strip=True)
+            link = f"https://oig.hhs.gov{title_tag['href']}"
+
+            date_text = action.find('span', class_='text-base-dark padding-right-105').get_text(strip=True)
+            date_object = datetime.strptime(date_text, "%B %d, %Y")
+
+            if date_object < base_date_obj:
+                stop_scraping = True
                 break
 
-            for action in actions:
-                title = action.find('h2', class_='usa-card__heading').get_text(strip=True)
-                link = "https://oig.hhs.gov" + action.find('h2').find('a')['href']
-                date_text = action.find('span', class_='text-base-dark padding-right-105').get_text(strip=True)
-                date_object = datetime.strptime(date_text, "%B %d, %Y")
-                category = action.find('ul', class_="display-inline add-list-reset").get_text(strip=True)
-                
-                if date_object < base_date_obj:
-                    stop_scraping = True
-                    break
-                
-                writer.writerow({'Title': title, 'Date': date_text, 'Category': category, 'Link': link})
-            
-            page_number += 1
-            sleep(1)  
-        
+            category = action.find('ul', class_='display-inline add-list-reset').get_text(strip=True)
+
+            all_data.append({'Title': title, 'Date': date_text, 'Category': category, 'Link': link})
+
+        page_number += 1
+        time.sleep(1)
+
+    return pd.DataFrame(all_data)
+
 def fetch_agency(link):
     try:
         response = requests.get(link)
+        response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
-        agency_tag = soup.find("ul", class_="usa-list usa-list--unstyled margin-y-2")
-        if agency_tag:
-            agency = agency_tag.find("span", class_="padding-right-2 text-base")
-            return agency.next_sibling.strip() if agency and agency.next_sibling else 'N/A'
+        agency_section = soup.find("ul", class_="usa-list usa-list--unstyled margin-y-2")
+        if agency_section:
+            for item in agency_section.find_all('li'):
+                if "Agency:" in item.get_text():
+                    return item.get_text(strip=True).replace("Agency: ", "")
     except requests.exceptions.RequestException as e:
         print(f"Error fetching {link}: {e}")
     return 'N/A'
-
-def add_agencies_to_csv(output_file):
-    df = pd.read_csv(output_file)
-    df['Agency'] = get_agencies(df)
-    df.to_csv(output_file, index=False)
 
 def get_agencies(df):
     with ThreadPoolExecutor(max_workers=10) as executor:
@@ -232,19 +231,31 @@ def get_agencies(df):
             agencies[index] = future.result()
     return agencies
 
-base_url = 'https://oig.hhs.gov/fraud/enforcement/'
-output_file = "enforcement_actions_since_jan2023.csv"
+def scrape_enforcement_actions(month, year):
+    base_url = 'https://oig.hhs.gov/fraud/enforcement/'
+    base_date_obj = datetime(year, month, 1)
 
-scrape_all_pages(base_url, 1, 2023, output_file)
+    # Scrape all pages starting from the base date
+    df = scrape_all_pages(base_url, base_date_obj)
+    
+    # Fetch agencies for each enforcement action
+    df['Agency'] = get_agencies(df)
+    
+    # Define the output filename
+    output_file = f"enforcement_actions_since_{year}_{month}.csv"
+    df.to_csv(output_file, index=False)
+    print(f"Data saved to {output_file}")
 
-add_agencies_to_csv(output_file)
+    return df
 
-print("Data scraped and saved to enforcement_actions_since_jan2023.csv")
+df = scrape_enforcement_actions(1, 2023)
+if df is not None:
+    print(df.head())
 ```
 
 Checking the number of rows and the details. 
 ```{python}
-output_file = "enforcement_actions_since_jan2023.csv"
+output_file = "enforcement_actions_since_2023_1.csv" 
 df = pd.read_csv(output_file)
 
 num_enforcement_actions = len(df)
@@ -264,47 +275,106 @@ print(f"Link: {earliest_action['Link']}")
 
 c. 
 ```{python}
-#using my partner's code to collect all data from 2021
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from datetime import datetime
+from time import sleep
 
+def scrape_enforcement_actions(base_url, start_date):
+    all_data = []
+    page_number = 1
+    stop_scraping = False
+
+    while not stop_scraping:
+        url = f"{base_url}?page={page_number}"
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Find all enforcement actions on the page
+        actions = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
+        if not actions:
+            break
+
+        for action in actions:
+            # Extract title, link, and date
+            title_tag = action.find('h2', class_='usa-card__heading').find('a')
+            title = title_tag.get_text(strip=True)
+            link = f"https://oig.hhs.gov{title_tag['href']}"
+
+            date_text = action.find('span', class_='text-base-dark padding-right-105').get_text(strip=True)
+            date_object = datetime.strptime(date_text, "%B %d, %Y")
+
+            # Stop scraping if the date is before the start date
+            if date_object < start_date:
+                stop_scraping = True
+                break
+
+            # Extract category and agency
+            category = action.find('ul', class_='display-inline add-list-reset').get_text(strip=True)
+            agency = fetch_agency(link)
+
+            # Append data to list
+            all_data.append({'Title': title, 'Date': date_text, 'Category': category, 'Link': link, 'Agency': agency})
+
+        page_number += 1
+        sleep(1)  # Add a delay to avoid overloading the server
+
+    # Convert to DataFrame and save to CSV
+    df = pd.DataFrame(all_data)
+    output_file = "enforcement_actions_since_jan2021.csv"
+    df.to_csv(output_file, index=False)
+    print(f"Data saved to {output_file}")
+
+    return df
+
+def fetch_agency(link):
+    try:
+        response = requests.get(link)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+        agency_section = soup.find("ul", class_="usa-list usa-list--unstyled margin-y-2")
+        if agency_section:
+            for item in agency_section.find_all('li'):
+                if "Agency:" in item.get_text():
+                    return item.get_text(strip=True).replace("Agency: ", "")
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching agency from {link}: {e}")
+    return 'N/A'
+
+# Scrape all enforcement actions from January 2021 onwards
 base_url = 'https://oig.hhs.gov/fraud/enforcement/'
-output_file_2021 = "enforcement_actions_since_jan2021.csv"
+start_date1 = datetime(2021, 1, 1)
+df1 = scrape_enforcement_actions(base_url, start_date1)
 
-scrape_all_pages(base_url, 1, 2021, output_file_2021)
+# Display summary information
+num_enforcement_actions = len(df)
+print(f"Total enforcement actions collected: {num_enforcement_actions}")
 
-add_agencies_to_csv(output_file_2021)
-df_2021 = pd.read_csv(output_file_2021)
-
-num_enforcement_actions_2021 = len(df_2021)
-print(f"Total enforcement actions collected since 2021: {num_enforcement_actions_2021}")
-
-df_2021['Date'] = pd.to_datetime(df_2021['Date'], errors='coerce')
-
-earliest_action_2021 = df_2021.sort_values(by='Date').iloc[0]
+# Convert 'Date' column to datetime format and find the earliest action
+df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+earliest_action = df.sort_values(by='Date').iloc[0]
 
 print("\nEarliest enforcement action scraped:")
-print(f"Date: {earliest_action_2021['Date']}")
-print(f"Title: {earliest_action_2021['Title']}")
-print(f"Category: {earliest_action_2021['Category']}")
-print(f"Agency: {earliest_action_2021['Agency']}")
-print(f"Link: {earliest_action_2021['Link']}")
-
+print(f"Date: {earliest_action['Date']}")
+print(f"Title: {earliest_action['Title']}")
+print(f"Category: {earliest_action['Category']}")
+print(f"Agency: {earliest_action['Agency']}")
+print(f"Link: {earliest_action['Link']}")
 ```
 
 ## Plot data based on scraped data (using Altair)
 
 ### 1.
 ```{python}
-import altair as alt
+df_2021 = pd.read_csv("enforcement_actions_since202101.csv")
 
-df_2021 = pd.read_csv("enforcement_actions_since_jan2021.csv")
+df_2021['date'] = pd.to_datetime(df_2021['date'], errors='coerce')
 
-df_2021['Date'] = pd.to_datetime(df_2021['Date'], errors='coerce')
+df_2021 = df_2021.dropna(subset=['date'])
 
-print(df_2021.head)
-
-df_2021 = df_2021.dropna(subset=['Date'])
-
-df_2021['YearMonth'] = df_2021['Date'].dt.to_period('M')
+df_2021['YearMonth'] = df_2021['date'].dt.to_period('M')
 monthly_counts = df_2021.groupby('YearMonth').size().reset_index(name='ActionCount')
 monthly_counts['YearMonth'] = monthly_counts['YearMonth'].dt.to_timestamp()
 
@@ -322,46 +392,147 @@ chart_step31.display()
 
 
 ### 2.
-
 ```{python}
-##the first plot for two distinct categories: 
+df_2021 = pd.read_csv("enforcement_actions_since202101.csv")
 
-df_2021['Date'] = pd.to_datetime(df_2021['Date'])
+df_2021['date'] = pd.to_datetime(df_2021['date'], errors='coerce')
+df_2021 = df_2021.dropna(subset=['date']) 
 
-# Mock classification between 'Criminal and Civil Actions' vs. 'State Enforcement Agencies'
-# Here I'll assume 'Category' tells us this information directly
+def categorize_title(title):
+    title = title.lower()
+    if any(word in title for word in ['health', 'healthcare', 'medicare', 'medical']):
+        return 'Health Care Fraud'
+    elif any(word in title for word in ['bank', 'financial', 'money']):
+        return 'Financial Fraud'
+    elif 'drug' in title or 'pharmacy' in title:
+        return 'Drug Enforcement'
+    elif any(word in title for word in ['bribe', 'corruption', 'corrupt']):
+        return 'Bribery/Corruption'
+    else:
+        return 'Other'
 
-# Group data by Category and count by month
-grouped_data = df_2021.groupby(['Category']).resample('M', on='Date').size().reset_index(name='Counts')
+df_2021['grouped_category'] = df_2021['title'].apply(categorize_title)
 
-# Plotting the data using Altair
-chart = alt.Chart(grouped_data).mark_line(point=True).encode(
-    x='Date:T',
-    y='Counts:Q',
-    color='Category:N',
-    tooltip=['Date:T', 'Counts:Q', 'Category:N']
+df_2021['YearMonth'] = df_2021['date'].dt.to_period('M')
+monthly_counts = df_2021.groupby(['YearMonth', 'grouped_category']).size().reset_index(name='ActionCount')
+monthly_counts['YearMonth'] = monthly_counts['YearMonth'].dt.to_timestamp()
+
+chart32 = alt.Chart(monthly_counts).mark_line(point=True).encode(
+    x=alt.X('YearMonth:T', title='Date (Month-Year)'),
+    y=alt.Y('ActionCount:Q', title='Number of Enforcement Actions'),
+    color='grouped_category:N'  # Different colors for each subcategory
 ).properties(
-    title='Number of Enforcement Actions by Category Over Time'
-).interactive()
+    title="Number of Enforcement Actions by Subcategory Over Time (Monthly Aggregation)",
+    width=600,
+    height=400
+)
 
-chart
+chart32.display()
 ```
-
-
-
-# Assuming 'Category' field categorizes actions into 
 
 
 ## Create maps of enforcement activity
 
-
 ### 1.
 
 
+
 ### 2.
+```{python}
+import geopandas as gpd
 
+print(df_2021.head())
+```
 
+```{python}
+USattorney = gpd.read_file("US_Attorney_Districts_Shapefile_simplified_20241109.csv")
 
+print(USattorney.head())
+```
+
+step 1. first, i want to filter enforcement actions by US attorney district: so finding df_2021 such that the column contains district 
+```{python}
+district_actions = df_2021[df_2021['Agency'].str.contains('District', na=False)]
+
+print(district_actions.head(10))
+```
+
+step 2. then i want to clean and standardize the district names such that the agency column in the csv file matches the judicial district column in the shapefile 
+
+```{python}
+district_actions.loc[:, 'District'] = district_actions['Agency'].str.extract(r'(U\.S\. Attorney\'s Office, .*District of [^\;]*)')[0]
+
+district_actions.loc[:, 'District'] = district_actions['District'].str.strip()
+
+print(district_actions.head(10))
+```
+
+step 3. Then I want to standardize the district column names for merging
+```{python}
+district_mapping = {
+    "U.S. Attorney's Office, Eastern District of Virginia": "Eastern Virginia",
+}
+
+district_actions.loc[:, 'District'] = district_actions['District'].replace(district_mapping)
+
+print(district_mapping)
+```
+
+step 4. merge the data together
+```{python}
+merged_data = pd.merge(district_actions, USattorney, left_on="District", right_on="Judicial District", how="left")
+```
+
+step 5. group by district and count enforcement actions
+```{python}
+district_counts = merged_data.groupby("District").size().reset_index(name="ActionCount")
+```
+
+step 6. plotting the map by district. 
+```{python}
+import geopandas as gpd
+import pandas as pd
+import matplotlib.pyplot as plt
+
+USattorney = gpd.read_file("US_Attorney_Districts_Shapefile_simplified_20241109.csv")
+USattorney = USattorney.merge(district_counts, left_on="Judicial District", right_on="District", how="left")
+
+# Step 2: Define color mapping based on ActionCount
+max_count = USattorney['ActionCount'].max()
+norm = mcolors.Normalize(vmin=0, vmax=max_count)
+cmap = plt.cm.OrRd  # Color map for visual effect
+
+# Step 3: Plot each district
+fig, ax = plt.subplots(figsize=(15, 10))
+for _, row in USattorney.iterrows():
+    geom = row['the_geom']  # Assuming this is the column with geometry
+    count = row['ActionCount']
+    
+    if isinstance(geom, (Polygon, MultiPolygon)):
+        color = cmap(norm(count)) if pd.notnull(count) else 'lightgrey'
+        
+        # For MultiPolygons, plot each part individually
+        if isinstance(geom, MultiPolygon):
+            for part in geom:
+                x, y = part.exterior.xy
+                ax.fill(x, y, color=color, edgecolor="black", linewidth=0.5)
+        else:
+            x, y = geom.exterior.xy
+            ax.fill(x, y, color=color, edgecolor="black", linewidth=0.5)
+
+# Step 4: Add color bar and labels
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+sm.set_array([])
+cbar = fig.colorbar(sm, ax=ax, orientation="vertical", fraction=0.03, pad=0.04)
+cbar.set_label("Number of Enforcement Actions", fontsize=12)
+
+# Final plot adjustments
+ax.set_title("Enforcement Actions by U.S. Attorney District", fontsize=16)
+ax.set_xlabel("Longitude")
+ax.set_ylabel("Latitude")
+ax.axis('equal')
+plt.show()
+```
 
 ## Extra Credit: Calculate the enforcement actions on a per-capita basis
 
