@@ -44,6 +44,14 @@ from concurrent.futures import ThreadPoolExecutor
 ### 1.
 
 ```{python}
+<<<<<<< HEAD
+=======
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+>>>>>>> main
 
 def fetch_page_data(url):
     response = requests.get(url)
@@ -197,11 +205,116 @@ Add a 1-second delay between pages to prevent server-side blockng. If a "next pa
 Step 6: Save data to CSV and print preview 
 Convert the collected data to a pandas DataFrame. Save the DataFrame to a CSV file named enforcement_actions_year_month.csv and print the first few rows for verification. 
 
-b. Based on the output, the total number of enforcement actions collected is 20. The date of the earliest enforcement actions is October 30th 2024. 
+**b.** Based on the output, the total number of enforcement actions collected is 1534. 
+Total enforcement actions collected: 1534
+Earliest enforcement action scraped:
+Date: 2023-01-03 00:00:00
+Title: Podiatrist Pays $90,000 To Settle False Billing Allegations
+Category: Criminal and Civil Actions
+Agency: January 3, 2023
+Link: https://oig.hhs.gov/fraud/enforcement/podiatrist-pays-90000-to-settle-false-billing-allegations/
 
-The details of the earliest enforcement action is "Quincy-Based Physician Group To Pay $650,000 To Resolve Allegations Of False Billing To MassHealth". 
+<<<<<<< HEAD
+=======
+```{python}
+from datetime import datetime 
+import requests
+from bs4 import BeautifulSoup
+import csv
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from time import sleep
 
+def scrape_all_pages(base_url, month, year, output_file):
+    page_number = 1
+    base_date_obj = datetime(year, month, 1) 
+    stop_scraping = False
 
+    with open(output_file, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=["Title", "Date", "Category", "Link"])
+        writer.writeheader()  # Write the header row once
+
+        while not stop_scraping:
+            url = f"{base_url}?page={page_number}"
+            response = requests.get(url)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            actions = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
+            
+            if not actions:
+                print(f"No more actions found on page {page_number}.")
+                break
+
+            for action in actions:
+                title = action.find('h2', class_='usa-card__heading').get_text(strip=True)
+                link = "https://oig.hhs.gov" + action.find('h2').find('a')['href']
+                date_text = action.find('span', class_='text-base-dark padding-right-105').get_text(strip=True)
+                date_object = datetime.strptime(date_text, "%B %d, %Y")
+                category = action.find('ul', class_="display-inline add-list-reset").get_text(strip=True)
+                
+                if date_object < base_date_obj:
+                    stop_scraping = True
+                    break
+                
+                writer.writerow({'Title': title, 'Date': date_text, 'Category': category, 'Link': link})
+            
+            page_number += 1
+            sleep(1)  
+        
+def fetch_agency(link):
+    try:
+        response = requests.get(link)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        agency_tag = soup.find("ul", class_="usa-list usa-list--unstyled margin-y-2")
+        if agency_tag:
+            agency = agency_tag.find("span", class_="padding-right-2 text-base")
+            return agency.next_sibling.strip() if agency and agency.next_sibling else 'N/A'
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching {link}: {e}")
+    return 'N/A'
+
+def add_agencies_to_csv(output_file):
+    df = pd.read_csv(output_file)
+    df['Agency'] = get_agencies(df)
+    df.to_csv(output_file, index=False)
+
+def get_agencies(df):
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_index = {executor.submit(fetch_agency, row['Link']): index for index, row in df.iterrows()}
+        agencies = ['N/A'] * len(df)
+        for future in as_completed(future_to_index):
+            index = future_to_index[future]
+            agencies[index] = future.result()
+    return agencies
+
+base_url = 'https://oig.hhs.gov/fraud/enforcement/'
+output_file = "enforcement_actions_since_jan2023.csv"
+
+scrape_all_pages(base_url, 1, 2023, output_file)
+
+add_agencies_to_csv(output_file)
+
+print("Data scraped and saved to enforcement_actions_since_jan2023.csv")
+```
+>>>>>>> main
+
+Checking the number of rows and the details. 
+```{python}
+output_file = "enforcement_actions_since_jan2023.csv"
+df = pd.read_csv(output_file)
+
+num_enforcement_actions = len(df)
+print(f"Total enforcement actions collected: {num_enforcement_actions}")
+
+df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+
+earliest_action = df.sort_values(by='Date').iloc[0]
+
+print("\nEarliest enforcement action scraped:")
+print(f"Date: {earliest_action['Date']}")
+print(f"Title: {earliest_action['Title']}")
+print(f"Category: {earliest_action['Category']}")
+print(f"Agency: {earliest_action['Agency']}")
+print(f"Link: {earliest_action['Link']}")
+```
 
 ## Plot data based on scraped data (using Altair)
 
@@ -246,8 +359,8 @@ the pseudo code:
 3. for those whose date meet our requirement, go to the "link" column
 4. go over each link on every page and then if we are still within the desired timeframe, go to next online page
 
-## Plot data based on scraped data (using Altair)
 
+## Plot data based on scraped data (using Altair)
 
 ### 1.
 
