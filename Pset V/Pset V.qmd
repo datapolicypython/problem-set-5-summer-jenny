@@ -24,7 +24,6 @@ execute:
 Partner 1: Summer Negahdar(samarneg)
 Partner 2: Jenny Zhong (jzhong1)
 This submission is our work alone and complies with the 30538 integrity policy.” Add
-<<<<<<< HEAD
 your initials to indicate your agreement: **__** **__**
 “I have uploaded the names of anyone else other than my partner and I worked with on
 the problem set here”
@@ -33,7 +32,6 @@ Late coins used this pset: **__** Late coins left after submission: **__**
 ### A NOTE TO INSTRUCTORS
 
 working on writing the function to scrape and crawl, we found the questions very ocnfusing in terms of task allocation to each partner and therefore instead of writing one short loop for first part and then writing a wholistic loop to scrape all pages we only wrote one gigantic function to scrape everything!
-=======
 your initials to indicate your agreement: **SN** **JZ**
 “I have uploaded the names of anyone else other than my partner and I worked with on the problem set here”
 
@@ -47,7 +45,6 @@ import datetime
 from time import sleep
 import os
 ```
->>>>>>> main
 
 ## Develop Initial scraper and crawler
 
@@ -217,6 +214,23 @@ b. Based on the output, the total number of enforcement actions collected is 20.
 The details of the earliest enforcement action is "Quincy-Based Physician Group To Pay $650,000 To Resolve Allegations Of False Billing To MassHealth". 
 
 ```{python}
+desired_dates= []
+for index, row in final_df.iterrows():
+    date = row['Date']
+    
+    # Check if date is before or after 2013
+    if date.year >= 2013:
+        # If date is after 2013, add it to the list
+        desired_dates.append(date)
+    else:
+        # If date is before 2013, print an error message
+        print("outside desired period")
+
+# Create a new DataFrame to save the valid dates
+desired_dates_df = pd.DataFrame(desired_dates, columns=['Date'])
+
+desired_dates_df.to_csv("enforcement_actions_month_year.csv", index=False)
+print(desired_dates_df.head(-5))
 def dynamic_scraper(month, year):
     if year < 2013:
         print("Please enter a year greater than or equal to 2013.")
@@ -232,10 +246,6 @@ def dynamic_scraper(month, year):
         response = requests.get(url)
         page = BeautifulSoup(response.content, 'html.parser')
 
-<<<<<<< HEAD
-desired_dates_df.to_csv("enforcement_actions_month_year.csv", index=False)
-print(desired_dates_df.head(-5))
-=======
         actions = page.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
         for action in actions:
             date_text = action.find('span', class_="text-base-dark padding-right-105").get_text(strip=True)
@@ -298,11 +308,10 @@ if not df.empty:
     print(f"Link: {earliest_action['Link']}")
 
 print(f"\nTotal enforcement actions collected: {len(df)}")
->>>>>>> main
 ```
 
 
-c. 
+c.
 
 ```{python}
 
@@ -374,6 +383,7 @@ the pseudo code:
     II. if not 2021 or more, break out of loop (this is a loop inside of the bigger loop)
 3. for those whose date meet our requirement, go to the "link" column
 4. go over each link on every page and then if we are still within the desired timeframe, go to next online page
+c. 
 
 ## Plot data based on scraped data (using Altair)
 
