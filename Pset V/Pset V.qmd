@@ -129,7 +129,7 @@ print(df.head())
 ```
 
 ```{python}
-final_df['Date'] = pd.to_datetime(final_df['Date'])
+df['Date'] = pd.to_datetime(df['Date'])
 
 # Check the data type to confirm
 print(df.dtypes)
@@ -247,14 +247,14 @@ print("Data scraped and saved to enforcement_actions_since_jan2023.csv")
 Checking the number of rows and the details. 
 ```{python}
 output_file = "enforcement_actions_since_jan2023.csv"
-df = pd.read_csv(output_file)
+final_df = pd.read_csv(output_file)
 
 num_enforcement_actions = len(df)
 print(f"Total enforcement actions collected: {num_enforcement_actions}")
 
-df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+final_df['Date'] = pd.to_datetime(final_df['Date'], errors='coerce')
 
-earliest_action = df.sort_values(by='Date').iloc[0]
+earliest_action = final_df.sort_values(by='Date').iloc[0]
 
 print("\nEarliest enforcement action scraped:")
 print(f"Date: {earliest_action['Date']}")
@@ -267,29 +267,67 @@ print(f"Link: {earliest_action['Link']}")
 c. 
 
 ```{python}
-#using my partner's code to collect all data from 2021
+#using my partner's function to subset data from 2021
+#it is taking longer bc it has to go over several pages to find all the articles form 2021 onward!
+from bs4 import BeautifulSoup
+import requests
+import pandas as pd
+from datetime import datetime
 
+def scrape_all_pages(base_url, month, year):
+    page_number = 1
+    stop_scraping = False
+    data = []
+
+    while not stop_scraping:
+        url = f"{base_url}?page={page_number}"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        actions = soup.find_all('li', class_='usa-card card--list pep-card--minimal mobile:grid-col-12')
+
+        for action in actions:
+            title_tag = action.find('h2', class_='usa-card__heading')
+            title = title_tag.get_text(strip=True) if title_tag else 'No Title Provided'
+            link_tag = title_tag.find('a')
+            link = f"https://oig.hhs.gov{link_tag['href']}" if link_tag else 'No Link Provided'
+            date_tag = action.find('span', class_='text-base-dark padding-right-105')
+            date = pd.to_datetime(date_tag.get_text(strip=True)) if date_tag else None
+            
+            if date and date < datetime(year, month, 1):
+                stop_scraping = True
+                break
+
+            category_tag = action.find('ul', class_='display-inline add-list-reset').find('li')
+            category = category_tag.get_text(strip=True) if category_tag else 'No Category Provided'
+
+            # Fetching the agency information
+            agency = 'N/A'  # Default if no agency info is found
+            detail_response = requests.get(link)
+            detail_soup = BeautifulSoup(detail_response.content, 'html.parser')
+            agency_tag = detail_soup.find("ul", class_="usa-list usa-list--unstyled margin-y-2")
+            if agency_tag:
+                agency_details = agency_tag.find("span", class_="padding-right-2 text-base")
+                agency = agency_details.next_sibling.strip() if agency_details and agency_details.next_sibling else 'N/A'
+
+            data.append({
+                'Title': title,
+                'Date': date,
+                'Category': category,
+                'Link': link,
+                'Agency': agency
+            })
+
+        page_number += 1
+
+    return pd.DataFrame(data)
+
+# Now call the function and filter from January 2021
 base_url = 'https://oig.hhs.gov/fraud/enforcement/'
-output_file_2021 = "enforcement_actions_since_jan2021.csv"
+df_2021 = scrape_all_pages(base_url, 1, 2021)
 
-scrape_all_pages(base_url, 1, 2021, output_file_2021)
-
-add_agencies_to_csv(output_file_2021)
-df_2021 = pd.read_csv(output_file_2021)
-
-num_enforcement_actions_2021 = len(df_2021)
-print(f"Total enforcement actions collected since 2021: {num_enforcement_actions_2021}")
-
-df_2021['Date'] = pd.to_datetime(df_2021['Date'], errors='coerce')
-
-earliest_action_2021 = df_2021.sort_values(by='Date').iloc[0]
-
-print("\nEarliest enforcement action scraped:")
-print(f"Date: {earliest_action_2021['Date']}")
-print(f"Title: {earliest_action_2021['Title']}")
-print(f"Category: {earliest_action_2021['Category']}")
-print(f"Agency: {earliest_action_2021['Agency']}")
-print(f"Link: {earliest_action_2021['Link']}")
+# Filtering only for actions from January 2021 onwards
+df_2021 = df_2021[df_2021['Date'] >= datetime(2021, 1, 1)]
+print(df_2021.head())
 
 ```
 
@@ -302,26 +340,42 @@ print(f"Link: {earliest_action_2021['Link']}")
 ### 2.
 
 ```{python}
-df_2021['Date'] = pd.to_datetime(df_2021['Date'])
-
-# function to categorize titles into subcategories
-def categorize_title(title):
-    title = title.lower()
-    if any(word in title for word in ['health', 'healthcare', 'medicare', 'medical']):
-        return 'Health Care Fraud'
-    elif any(word in title for word in ['bank', 'financial', 'money', 'financial']):
+##manually categorizing
+def categorize_topic(title):
+    if 'health' in title.lower():
+        return 'Health Care'
+    elif any(word in title.lower() for word in ['financial', 'bank']):
         return 'Financial Fraud'
-    elif 'drug' in title or 'pharmacy' in title:
+    elif 'drug' in title.lower():
         return 'Drug Enforcement'
-    elif any(word in title for word in ['bribe', 'corruption', 'corrupt']):
+    elif any(word in title.lower() for word in ['bribery', 'corruption']):
         return 'Bribery/Corruption'
     else:
         return 'Other'
 
-df_2021['grouped category'] = df_2021['Title'].apply(categorize_title)
 
-# Grouping data by Category, Topic, and count by month
-grouped_data = df_2021.groupby('grouped category').resample('M', on='Date').size().unstack(level=[0, 1], fill_value=0)
+df_2021['Topic'] = df_2021['Title'].apply(categorize_topic)
+
+df_2021['Month'] = df_2021['Date'].dt.to_period('M')
+
+# Group by Month and Topic, and count entries
+summary = df_2021.groupby(['Month', 'Topic']).size().reset_index(name='Counts')
+
+# Ensure the 'Month' is treated as a Date type for plotting
+summary['Month'] = summary['Month'].dt.to_timestamp()
+
+# Plotting with Altair
+chart = alt.Chart(summary).mark_line().encode(
+    x='Month:T',  
+    y='Counts:Q',
+    color='Topic:N',
+    tooltip=['Month', 'Counts', 'Topic']
+).properties(
+    width=600,
+    height=300,
+    title='Enforcement Actions Over Time by Topic'
+)
+chart.display()
 ```
 
 
@@ -331,6 +385,12 @@ grouped_data = df_2021.groupby('grouped category').resample('M', on='Date').size
 
 
 ### 1.
+
+```{python}
+#I need to extract state names from agency column:
+df_2021['State'] = df_2021['Agency'].apply(lambda x: x.split("District of ")[-1] if "District of " in x else None)
+print(df_2021.head['State'](5))
+```
 
 
 ### 2.
