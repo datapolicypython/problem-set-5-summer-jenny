@@ -36,7 +36,6 @@ import requests
 import datetime
 from time import sleep
 import os
-from concurrent.futures import ThreadPoolExecutor
 ```
 
 ## Develop Initial scraper and crawler
